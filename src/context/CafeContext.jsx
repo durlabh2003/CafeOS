@@ -83,7 +83,8 @@ export const CafeProvider = ({ children }) => {
             currency: settings.currency || '₹',
             gstPercentage: settings.gst_percentage || 5,
             loyaltyEarnRate: settings.loyalty_earn_rate || 5,
-            loyaltyRedeemRate: settings.loyalty_redeem_rate || 0.1
+            loyaltyRedeemRate: settings.loyalty_redeem_rate || 0.1,
+            defaultBillingMode: settings.default_billing_mode || 'Pay After Service'
           }));
         }
 
@@ -419,6 +420,17 @@ export const CafeProvider = ({ children }) => {
     }
   };
 
+  const updateTableStatus = async (tableId, newStatus) => {
+    try {
+      await supabase.from('tables').update({ status: newStatus }).eq('id', tableId);
+      setTables(prev => prev.map(t => t.id === tableId ? { ...t, status: newStatus } : t));
+      return { success: true };
+    } catch (err) {
+      console.error('Update table status error:', err);
+      return { success: false, message: err.message };
+    }
+  };
+
   const transferTable = async (oldTableId, newTableId) => {
     const oldTable = tables.find(t => t.id === oldTableId);
     const newTable = tables.find(t => t.id === newTableId);
@@ -590,7 +602,7 @@ export const CafeProvider = ({ children }) => {
          name: newProfile.name, phone: newProfile.phone, address: newProfile.address, gstin: newProfile.gstNumber
        }).eq('id', newProfile.id);
        await supabase.from('settings').update({
-         gst_percentage: newProfile.gstPercentage, loyalty_earn_rate: newProfile.loyaltyEarnRate, loyalty_redeem_rate: newProfile.loyaltyRedeemRate
+         gst_percentage: newProfile.gstPercentage, loyalty_earn_rate: newProfile.loyaltyEarnRate, loyalty_redeem_rate: newProfile.loyaltyRedeemRate, default_billing_mode: newProfile.defaultBillingMode
        }).eq('cafe_id', newProfile.id);
     } else {
        const cafeRes = await supabase.from('cafes').insert({
@@ -599,7 +611,7 @@ export const CafeProvider = ({ children }) => {
        if(cafeRes.data) {
          newProfile.id = cafeRes.data.id;
          await supabase.from('settings').insert({
-           cafe_id: cafeRes.data.id, gst_percentage: newProfile.gstPercentage, loyalty_earn_rate: newProfile.loyaltyEarnRate, loyalty_redeem_rate: newProfile.loyaltyRedeemRate
+           cafe_id: cafeRes.data.id, gst_percentage: newProfile.gstPercentage, loyalty_earn_rate: newProfile.loyaltyEarnRate, loyalty_redeem_rate: newProfile.loyaltyRedeemRate, default_billing_mode: newProfile.defaultBillingMode
          });
        }
     }
@@ -648,7 +660,7 @@ export const CafeProvider = ({ children }) => {
       cafeProfile, setCafeProfile, menu, tables, crm, payments, orders, staff, otpNotifications, activeCustomerSessions,
       triggerOtpSms, verifyOtp, logoutCustomerSession, placeOrder, updateOrderStatus, getConsolidatedBill, checkoutSession,
       releaseTable, addMenuItem, updateMenuItem, deleteMenuItem, addNewTable, transferTable, addStaff, updateStaff, deactivateStaff, processTakeaway,
-      updateCafeProfile, regenerateTableQR, closeShift, getShiftHistory
+      updateCafeProfile, regenerateTableQR, closeShift, getShiftHistory, updateTableStatus
     }}>
       {children}
     </CafeContext.Provider>

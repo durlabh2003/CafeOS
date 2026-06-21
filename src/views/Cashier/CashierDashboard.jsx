@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCafe } from '../../context/CafeContext';
+import { printKOT } from '../../utils/printerSupport';
 
 export default function CashierDashboard() {
   const {
@@ -15,9 +16,9 @@ export default function CashierDashboard() {
     getConsolidatedBill,
     checkoutSession,
     verifyOtp,
-    transferTable,
     processTakeaway,
-    closeShift
+    closeShift,
+    updateTableStatus
   } = useCafe();
 
   const [activeTab, setActiveTab] = useState('pos');
@@ -46,6 +47,10 @@ export default function CashierDashboard() {
 
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferTargetId, setTransferTargetId] = useState('');
+
+  // Waitlist State
+  const [waitlist, setWaitlist] = useState([]);
+  const [waitlistForm, setWaitlistForm] = useState({ name: '', mobile: '', pax: 2, time: '' });
 
   const [orderFilter, setOrderFilter] = useState('All');
   const [customerSearch, setCustomerSearch] = useState('');
@@ -300,6 +305,7 @@ export default function CashierDashboard() {
             { id: 'pos', icon: '🖥️', label: 'POS & Tables' },
             { id: 'orders', icon: '📋', label: 'Active Orders' },
             { id: 'customers', icon: '👥', label: 'Customers' },
+            { id: 'reservations', icon: '📅', label: 'Reservations' },
             { id: 'shift', icon: '💰', label: 'Shift & Cash' }
           ].map(tab => (
             <button
@@ -465,39 +471,59 @@ export default function CashierDashboard() {
                 </div>
               )}
 
-              {!pendingCart && selectedTable.status === 'Available' && !isOrdering && (
+              {!pendingCart && ['Available', 'Reserved', 'Cleaning'].includes(selectedTable.status) && !isOrdering && (
                 <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <div className="premium-card" style={{ padding: '24px' }}>
-                    <h4 style={{ fontSize: '16px', color: 'var(--color-text-primary)', marginBottom: '16px' }}>👤 Check-In Customer</h4>
-                    <form onSubmit={handleCheckIn} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>Customer Name</span>
-                        <input
-                          type="text"
-                          value={checkInForm.name}
-                          onChange={(e) => setCheckInForm({ ...checkInForm, name: e.target.value })}
-                          placeholder="e.g. Ramesh Patel"
-                        />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>Mobile Number *</span>
-                        <input
-                          type="tel"
-                          value={checkInForm.mobile}
-                          onChange={(e) => setCheckInForm({ ...checkInForm, mobile: e.target.value })}
-                          placeholder="e.g. 9876543210"
-                          required
-                        />
-                      </div>
-                      <button type="submit" className="btn-primary" style={{ marginTop: '8px', justifyContent: 'center' }}>
-                        Assign Table
-                      </button>
-                    </form>
+                  
+                  <div style={{ display: 'flex', gap: '8px', padding: '16px', background: 'var(--color-bg-base)', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
+                    {selectedTable.status === 'Available' && (
+                      <>
+                        <button className="btn-secondary" onClick={() => updateTableStatus(selectedTable.id, 'Reserved')} style={{ flex: 1, fontSize: '12px', padding: '8px' }}>📅 Mark Reserved</button>
+                        <button className="btn-secondary" onClick={() => updateTableStatus(selectedTable.id, 'Cleaning')} style={{ flex: 1, fontSize: '12px', padding: '8px' }}>🧹 Mark Cleaning</button>
+                      </>
+                    )}
+                    {selectedTable.status === 'Reserved' && (
+                      <button className="btn-secondary" onClick={() => updateTableStatus(selectedTable.id, 'Available')} style={{ flex: 1, fontSize: '12px', padding: '8px' }}>❌ Cancel Reservation</button>
+                    )}
+                    {selectedTable.status === 'Cleaning' && (
+                      <button className="btn-secondary" onClick={() => updateTableStatus(selectedTable.id, 'Available')} style={{ flex: 1, fontSize: '12px', padding: '8px', background: 'var(--color-success)', color: '#fff', border: 'none' }}>✨ Cleaned (Make Available)</button>
+                    )}
                   </div>
-                  <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: '500' }}>OR</div>
-                  <button className="btn-secondary" onClick={() => setIsOrdering(true)} style={{ justifyContent: 'center', padding: '16px', fontWeight: '600' }}>
-                    🍔 Direct Order (Walk-In)
-                  </button>
+
+                  {['Available', 'Reserved'].includes(selectedTable.status) && (
+                    <>
+                      <div className="premium-card" style={{ padding: '24px' }}>
+                        <h4 style={{ fontSize: '16px', color: 'var(--color-text-primary)', marginBottom: '16px' }}>👤 Check-In Customer</h4>
+                        <form onSubmit={handleCheckIn} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>Customer Name</span>
+                            <input
+                              type="text"
+                              value={checkInForm.name}
+                              onChange={(e) => setCheckInForm({ ...checkInForm, name: e.target.value })}
+                              placeholder="e.g. Ramesh Patel"
+                            />
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>Mobile Number *</span>
+                            <input
+                              type="tel"
+                              value={checkInForm.mobile}
+                              onChange={(e) => setCheckInForm({ ...checkInForm, mobile: e.target.value })}
+                              placeholder="e.g. 9876543210"
+                              required
+                            />
+                          </div>
+                          <button type="submit" className="btn-primary" style={{ marginTop: '8px', justifyContent: 'center' }}>
+                            {selectedTable.status === 'Reserved' ? 'Confirm Arrival & Assign Table' : 'Assign Table'}
+                          </button>
+                        </form>
+                      </div>
+                      <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: '500' }}>OR</div>
+                      <button className="btn-secondary" onClick={() => setIsOrdering(true)} style={{ justifyContent: 'center', padding: '16px', fontWeight: '600' }}>
+                        🍔 Direct Order (Walk-In)
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -610,11 +636,19 @@ export default function CashierDashboard() {
                               </div>
                             ))}
                           </div>
-                          {order.status === 'Ready' && (
-                            <button className="btn-primary" onClick={() => updateOrderStatus(order.id, 'Served')} style={{ width: '100%', marginTop: '16px', justifyContent: 'center', background: 'var(--color-success)' }}>
-                              ✓ Mark as Served
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                            <button className="btn-secondary" onClick={async () => {
+                              const res = await printKOT(order, selectedTable.name);
+                              if (!res.success) alert(res.message);
+                            }} style={{ flex: 1, padding: '8px', fontSize: '13px' }}>
+                              🖨️ Print KOT
                             </button>
-                          )}
+                            {order.status === 'Ready' && (
+                              <button className="btn-primary" onClick={() => updateOrderStatus(order.id, 'Served')} style={{ flex: 1, justifyContent: 'center', background: 'var(--color-success)', padding: '8px', fontSize: '13px' }}>
+                                ✓ Served
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -819,7 +853,23 @@ export default function CashierDashboard() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h4 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-text-primary)' }}>💳 Split Payments</h4>
+                <div className="flex-between">
+                  <h4 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-text-primary)' }}>💳 Split Payments</h4>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {[1, 2, 3].map(parts => (
+                      <button key={parts} onClick={() => {
+                        const amountPerPart = +(billTotals.net / parts).toFixed(2);
+                        setPaymentSplit([
+                          { mode: 'UPI', amount: amountPerPart },
+                          { mode: 'Cash', amount: parts > 1 ? amountPerPart : 0 },
+                          { mode: 'Card', amount: parts > 2 ? amountPerPart : 0 }
+                        ]);
+                      }} style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--color-border)', background: '#f8fafc', fontWeight: '700' }}>
+                        {parts === 1 ? 'Full' : `1/${parts} Split`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {paymentSplit.map((pay, idx) => (
                   <div key={idx} className="flex-between">
                     <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--color-text-secondary)' }}>{pay.mode}</span>
@@ -913,6 +963,78 @@ export default function CashierDashboard() {
           </div>
         </div>
       )}
+
+        {/* --- RESERVATIONS TAB --- */}
+        {activeTab === 'reservations' && (
+          <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
+            <div className="flex-between" style={{ marginBottom: '24px' }}>
+              <div>
+                <h2 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--color-text-primary)' }}>📅 Waitlist & Reservations</h2>
+                <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>Manage walk-in waitlists and future bookings.</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '24px' }}>
+              <div className="premium-card" style={{ flex: 1, padding: '24px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>Add to Waitlist</h3>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!waitlistForm.name || !waitlistForm.mobile) return;
+                  setWaitlist([...waitlist, { ...waitlistForm, id: Date.now(), status: 'Waiting', createdAt: new Date().toISOString() }]);
+                  setWaitlistForm({ name: '', mobile: '', pax: 2, time: '' });
+                }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: '600' }}>Guest Name</label>
+                    <input type="text" value={waitlistForm.name} onChange={e => setWaitlistForm({...waitlistForm, name: e.target.value})} placeholder="John Doe" required style={{ width: '100%', marginTop: '4px' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: '600' }}>Mobile</label>
+                    <input type="tel" value={waitlistForm.mobile} onChange={e => setWaitlistForm({...waitlistForm, mobile: e.target.value})} placeholder="9876543210" required style={{ width: '100%', marginTop: '4px' }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '13px', fontWeight: '600' }}>Pax (Guests)</label>
+                      <input type="number" min="1" value={waitlistForm.pax} onChange={e => setWaitlistForm({...waitlistForm, pax: parseInt(e.target.value) || 1})} style={{ width: '100%', marginTop: '4px' }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '13px', fontWeight: '600' }}>Time (Optional)</label>
+                      <input type="time" value={waitlistForm.time} onChange={e => setWaitlistForm({...waitlistForm, time: e.target.value})} style={{ width: '100%', marginTop: '4px' }} />
+                    </div>
+                  </div>
+                  <button type="submit" className="btn-primary" style={{ marginTop: '8px', justifyContent: 'center' }}>Add to List</button>
+                </form>
+              </div>
+
+              <div className="premium-card" style={{ flex: 2, padding: '24px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px' }}>Current Queue</h3>
+                {waitlist.length === 0 ? (
+                  <div style={{ padding: '32px', textAlign: 'center', color: 'var(--color-text-muted)' }}>No guests on the waitlist.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {waitlist.map(w => (
+                      <div key={w.id} className="flex-between" style={{ padding: '16px', border: '1px solid var(--color-border)', borderRadius: '8px', background: w.status === 'Seated' ? '#f8fafc' : '#ffffff', opacity: w.status === 'Seated' ? 0.6 : 1 }}>
+                        <div>
+                          <div style={{ fontWeight: '700', fontSize: '15px' }}>{w.name} <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--color-text-secondary)' }}>• {w.pax} Pax</span></div>
+                          <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>📱 {w.mobile} {w.time && `• 🕒 ${w.time}`}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          {w.status === 'Waiting' && (
+                            <button className="btn-primary" onClick={() => {
+                              setWaitlist(waitlist.map(item => item.id === w.id ? { ...item, status: 'Seated' } : item));
+                            }} style={{ fontSize: '12px', padding: '6px 12px' }}>Mark Seated</button>
+                          )}
+                          <button className="btn-secondary" onClick={() => {
+                            setWaitlist(waitlist.filter(item => item.id !== w.id));
+                          }} style={{ fontSize: '12px', padding: '6px 12px', color: 'var(--color-danger)' }}>Remove</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* Toast Notifications Container */}
       <div style={{ position: 'fixed', bottom: '24px', right: '24px', display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 9999 }}>

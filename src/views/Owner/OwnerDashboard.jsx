@@ -779,6 +779,18 @@ export default function OwnerDashboard() {
                 <label style={{ fontSize: '13px', fontWeight: '600' }}>Full Address</label>
                 <textarea rows="2" value={cafeProfile.address} onChange={e => setCafeProfile({...cafeProfile, address: e.target.value})}></textarea>
               </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--color-border)', paddingTop: '20px', marginTop: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600' }}>Default Billing Mode</label>
+                <select 
+                  value={cafeProfile.defaultBillingMode || 'Pay After Service'} 
+                  onChange={e => setCafeProfile({...cafeProfile, defaultBillingMode: e.target.value})}
+                  style={{ width: '100%', maxWidth: '300px' }}
+                >
+                  <option value="Pay After Service">Pay After Service (Standard)</option>
+                  <option value="Prepaid">Prepaid (Takeaway/QSR)</option>
+                </select>
+                <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Determines how bills are generated for new tables.</span>
+              </div>
               <button className="btn-primary" onClick={() => {
                 updateCafeProfile(cafeProfile);
                 alert('Business profile updated successfully!');

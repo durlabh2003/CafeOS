@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCafe } from '../../context/CafeContext';
+import { printKOT } from '../../utils/printerSupport';
 
 const KDSTicketCard = ({ order, onNextStatus, menu, stationFilter }) => {
   const [elapsed, setElapsed] = useState(0);
@@ -73,6 +74,14 @@ const KDSTicketCard = ({ order, onNextStatus, menu, stationFilter }) => {
       </div>
 
       <div style={{ padding: '16px 20px', background: 'var(--color-bg-base)', borderTop: '1px solid var(--color-border)' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: (order.status === 'New' || order.status === 'Preparing') ? '12px' : '0' }}>
+          <button className="btn-secondary" onClick={async () => {
+            const res = await printKOT(order, `Table ${order.tableId.slice(-2)}`);
+            if (!res.success) alert(res.message);
+          }} style={{ flex: 1, padding: '8px', fontSize: '13px', justifyContent: 'center' }}>
+            🖨️ Print Ticket
+          </button>
+        </div>
         {order.status === 'New' && (
           <button className="btn-primary" onClick={() => onNextStatus(order.id, 'Preparing')} style={{ width: '100%', justifyContent: 'center', background: 'var(--color-warning)', padding: '12px' }}>👨‍🍳 Start Preparing</button>
         )}
