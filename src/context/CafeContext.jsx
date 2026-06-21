@@ -417,19 +417,168 @@ export const CafeProvider = ({ children }) => {
   };
 
   const transferTable = async (oldTableId, newTableId) => {
-    // Left empty for brevity, requires similar updates
+    const oldTable = tables.find(t => t.id === oldTableId);
+    const newTable = tables.find(t => t.id === newTableId);
+    if (!oldTable || !newTable) return { success: false, message: 'Invalid table selection' };
+    if (newTable.status !== 'Available') return { success: false, message: 'Destination table is not available' };
+    if (!oldTable.currentSession) return { success: false, message: 'Source table has no active session' };
+
+    try {
+      // 1. Move all active orders to the new table in Supabase
+      const activeOrderIds = orders
+        .filter(o => o.tableId === oldTableId && o.status !== 'Completed' && o.status !== 'Cancelled')
+        .map(o => o.id);
+
+      if (activeOrderIds.length > 0) {
+        await supabase.from('orders').update({ table_id: newTableId }).in('id', activeOrderIds);
+      }
+
+      // 2. Transfer session to new table
+      const session = oldTable.currentSession;
+      await supabase.from('tables').update({ status: 'Occupied', current_session: session }).eq('id', newTableId);
+
+      // 3. Release old table
+      await supabase.from('tables').update({ status: 'Available', current_session: null }).eq('id', oldTableId);
+
+      // 4. Update local state
+      setOrders(prev => prev.map(o =>
+        activeOrderIds.includes(o.id) ? { ...o, tableId: newTableId, table_id: newTableId } : o
+      ));
+      setTables(prev => prev.map(t => {
+        if (t.id === oldTableId) return { ...t, status: 'Available', currentSession: null, current_session: null };
+        if (t.id === newTableId) return { ...t, status: 'Occupied', currentSession: session, current_session: session };
+        return t;
+      }));
+
+      return { success: true, movedOrders: activeOrderIds.length };
+    } catch (err) {
+      console.error('Transfer table error:', err);
+      return { success: false, message: err.message };
+    }
   };
 
   const addStaff = async (staffData) => {
-    const newStaff = { name: staffData.name, role: staffData.role, status: 'Active' };
+    const newStaff = { 
+      name: staffData.name, 
+      role: staffData.role, 
+      email: staffData.email || null,
+      phone: staffData.phone || null,
+      status: 'Active' 
+    };
     const inserted = await supabase.from('staff').insert(newStaff).select().single();
     if (inserted.data) {
       setStaff(prev => [...prev, inserted.data]);
     }
+    return inserted;
+  };
+
+  const updateStaff = async (staffId, updatedData) => {
+    const data = {};
+    if (updatedData.name) data.name = updatedData.name;
+    if (updatedData.role) data.role = updatedData.role;
+    if (updatedData.email !== undefined) data.email = updatedData.email;
+    if (updatedData.phone !== undefined) data.phone = updatedData.phone;
+
+    await supabase.from('staff').update(data).eq('id', staffId);
+    setStaff(prev => prev.map(s => s.id === staffId ? { ...s, ...data } : s));
+  };
+
+  const deactivateStaff = async (staffId) => {
+    await supabase.from('staff').update({ status: 'Inactive' }).eq('id', staffId);
+    setStaff(prev => prev.map(s => s.id === staffId ? { ...s, status: 'Inactive' } : s));
   };
 
   const processTakeaway = async (customerMobile, items, notes, paymentModes, totalCollected, discountAmount = 0, redeemedPoints = 0) => {
-    alert("Takeaway processing updated for new DB.");
+    try {
+      // 1. Create takeaway order in Supabase (no table_id)
+      const subtotal = items.reduce((acc, it) => acc + (it.price * it.qty), 0);
+      const gstAmount = Math.round((subtotal * cafeProfile.gstPercentage) / 100);
+      const grandTotal = subtotal + gstAmount;
+      const netAmount = Math.max(0, grandTotal - discountAmount);
+
+      const newOrder = {
+        table_id: null,
+        status: 'New',
+        source: 'Takeaway',
+        notes: notes || '',
+        amount: subtotal
+      };
+
+      const insertedOrder = await supabase.from('orders').insert(newOrder).select().single();
+      if (!insertedOrder.data) throw new Error('Failed to create takeaway order');
+
+      // 2. Insert order items
+      const orderItems = items.map(it => ({
+        order_id: insertedOrder.data.id,
+        item_id: it.id,
+        qty: it.qty,
+        price: it.price,
+        variant_name: it.name
+      }));
+      await supabase.from('order_items').insert(orderItems);
+
+      // 3. Look up or create customer
+      let mobile = customerMobile;
+      if (mobile && !mobile.startsWith('+91')) mobile = '+91 ' + mobile;
+      
+      if (mobile && mobile.length > 5) {
+        let crmData = crm[mobile];
+        if (!crmData) {
+          crmData = { mobile, name: 'Takeaway Customer', visit_count: 1, total_spend: 0, last_visit: new Date().toISOString().split('T')[0] };
+          await supabase.from('customers').insert(crmData);
+          setCrm(prev => ({ ...prev, [mobile]: { ...crmData, totalSpend: 0, lastVisit: crmData.last_visit } }));
+        }
+      }
+
+      // 4. Create bill record
+      const billRes = await supabase.from('bills').insert({
+        subtotal,
+        tax: gstAmount,
+        discount: discountAmount,
+        grand_total: netAmount,
+        status: 'Paid'
+      }).select().single();
+
+      // 5. Create payment records
+      if (billRes.data) {
+        const newPayments = paymentModes.filter(pm => pm.amount > 0).map(pm => ({
+          bill_id: billRes.data.id,
+          amount: pm.amount,
+          mode: pm.mode,
+          collected_by: currentStaff ? currentStaff.name : 'System POS'
+        }));
+        if (newPayments.length > 0) {
+          const insertedPayments = await supabase.from('payments').insert(newPayments).select();
+          if (insertedPayments.data) {
+            setPayments(prev => [...insertedPayments.data.map(p => ({
+              ...p,
+              billRef: billRes.data.bill_number || billRes.data.id,
+              tableName: 'Takeaway',
+              customerName: 'Takeaway Customer',
+              collectedBy: p.collected_by
+            })), ...prev]);
+          }
+        }
+      }
+
+      // 6. Update local orders state
+      const uiOrder = {
+        ...newOrder,
+        id: insertedOrder.data.id,
+        tableId: null,
+        table_id: null,
+        sessionMobile: mobile,
+        timestamp: new Date().toISOString(),
+        items,
+        orderNumber: insertedOrder.data.order_number || insertedOrder.data.id
+      };
+      setOrders(prev => [uiOrder, ...prev]);
+
+      return { success: true, orderId: insertedOrder.data.id };
+    } catch (err) {
+      console.error('Takeaway processing error:', err);
+      return { success: false, message: err.message };
+    }
   };
 
   const updateCafeProfile = async (newProfile) => {
@@ -458,13 +607,45 @@ export const CafeProvider = ({ children }) => {
     await releaseTable(tableId);
   };
 
+  const closeShift = async (shiftData) => {
+    try {
+      const payload = {
+        staff_name: shiftData.staffName,
+        shift_start: shiftData.shiftStart || new Date().toISOString(),
+        shift_end: new Date().toISOString(),
+        expected_cash: shiftData.expectedCash,
+        actual_cash: shiftData.actualCash,
+        variance: shiftData.variance,
+        total_upi: shiftData.totalUPI,
+        total_card: shiftData.totalCard,
+        total_transactions: shiftData.totalTransactions
+      };
+      const inserted = await supabase.from('shift_logs').insert(payload).select().single();
+      return { success: true, data: inserted.data };
+    } catch (err) {
+      console.error('Error closing shift:', err);
+      return { success: false, message: err.message };
+    }
+  };
+
+  const getShiftHistory = async () => {
+    try {
+      const { data, error } = await supabase.from('shift_logs').select('*').order('created_at', { ascending: false }).limit(30);
+      if (error) throw error;
+      return { success: true, data };
+    } catch (err) {
+      console.error('Error fetching shift history:', err);
+      return { success: false, message: err.message };
+    }
+  };
+
   return (
     <CafeContext.Provider value={{
       currentStaff, loginStaff, logoutStaff,
       cafeProfile, setCafeProfile, menu, tables, crm, payments, orders, staff, otpNotifications, activeCustomerSessions,
       triggerOtpSms, verifyOtp, logoutCustomerSession, placeOrder, updateOrderStatus, getConsolidatedBill, checkoutSession,
-      releaseTable, addMenuItem, updateMenuItem, deleteMenuItem, addNewTable, transferTable, addStaff, processTakeaway,
-      updateCafeProfile, regenerateTableQR
+      releaseTable, addMenuItem, updateMenuItem, deleteMenuItem, addNewTable, transferTable, addStaff, updateStaff, deactivateStaff, processTakeaway,
+      updateCafeProfile, regenerateTableQR, closeShift, getShiftHistory
     }}>
       {children}
     </CafeContext.Provider>

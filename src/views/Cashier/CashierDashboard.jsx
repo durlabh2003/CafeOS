@@ -14,10 +14,10 @@ export default function CashierDashboard() {
     updateOrderStatus,
     getConsolidatedBill,
     checkoutSession,
-    releaseTable,
     verifyOtp,
     transferTable,
-    processTakeaway
+    processTakeaway,
+    closeShift
   } = useCafe();
 
   const [activeTab, setActiveTab] = useState('pos');
@@ -198,7 +198,8 @@ export default function CashierDashboard() {
   const handleSettlement = async () => {
     const totalCollected = paymentSplit.reduce((sum, s) => sum + parseFloat(s.amount || 0), 0);
     if (Math.round(totalCollected) !== Math.round(billTotals.net)) {
-      alert(`Payment mismatched! Collected: ₹${totalCollected}, Required: ₹${billTotals.net}`);
+      setToasts(prev => [...prev, { id: 'pay-err-' + Date.now(), message: `❌ Payment mismatched! Collected: ₹${totalCollected}, Required: ₹${billTotals.net}` }]);
+      setTimeout(() => setToasts(prev => prev.filter(t => !t.id.startsWith('pay-err-'))), 6000);
       return;
     }
 
@@ -215,7 +216,8 @@ export default function CashierDashboard() {
 
     setShowBillingModal(false);
     setSelectedTableId(null);
-    alert('Bill Settled successfully!');
+    setToasts(prev => [...prev, { id: 'settle-' + Date.now(), message: '✅ Bill settled successfully!' }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => !t.id.startsWith('settle-'))), 5000);
   };
 
   const getTableStatusClass = (status) => {
@@ -692,9 +694,25 @@ export default function CashierDashboard() {
                 </strong>
               </div>
 
-              <button className="btn-primary" onClick={() => {
-                alert(`Shift Closed! Variance recorded: ₹${shiftVariance.toFixed(2)}`);
-                logoutStaff();
+              <button className="btn-primary" onClick={async () => {
+                if (window.confirm(`Are you sure you want to close this shift with a variance of ₹${shiftVariance.toFixed(2)}?`)) {
+                  const shiftData = {
+                    staffName: currentStaff.name,
+                    expectedCash: shiftCash,
+                    actualCash: actualCash,
+                    variance: shiftVariance,
+                    totalUPI: shiftUPI,
+                    totalCard: shiftCard,
+                    totalTransactions: shiftPayments.length
+                  };
+                  const res = await closeShift(shiftData);
+                  if (res.success) {
+                    alert(`Shift Closed! Variance recorded: ₹${shiftVariance.toFixed(2)}`);
+                    logoutStaff();
+                  } else {
+                    alert(`Failed to close shift: ${res.message}`);
+                  }
+                }
               }} style={{ width: '100%', justifyContent: 'center', padding: '16px', fontSize: '16px', background: 'var(--color-owner)' }}>
                 Close Shift & Log Out
               </button>
@@ -804,11 +822,19 @@ export default function CashierDashboard() {
 
             <div style={{ display: 'flex', gap: '16px' }}>
               <button className="btn-secondary" onClick={() => setShowTransferModal(false)} style={{ flex: 1, justifyContent: 'center' }}>Cancel</button>
-              <button className="btn-primary" onClick={() => {
+              <button className="btn-primary" onClick={async () => {
                 if (!transferTargetId) return;
-                transferTable(selectedTableId, transferTargetId);
+                const result = await transferTable(selectedTableId, transferTargetId);
                 setShowTransferModal(false);
-                setSelectedTableId(transferTargetId);
+                if (result.success) {
+                  setSelectedTableId(transferTargetId);
+                  const destName = tables.find(t => t.id === transferTargetId)?.name || transferTargetId;
+                  setToasts(prev => [...prev, { id: 'transfer-' + Date.now(), message: `✅ Transferred ${result.movedOrders} order(s) to ${destName}` }]);
+                  setTimeout(() => setToasts(prev => prev.filter(t => !t.id.startsWith('transfer-'))), 5000);
+                } else {
+                  setToasts(prev => [...prev, { id: 'transfer-err-' + Date.now(), message: `❌ Transfer failed: ${result.message}` }]);
+                  setTimeout(() => setToasts(prev => prev.filter(t => !t.id.startsWith('transfer-err-'))), 5000);
+                }
               }} style={{ flex: 1, justifyContent: 'center' }}>Confirm Transfer</button>
             </div>
           </div>

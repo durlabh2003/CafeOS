@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCafe } from '../../context/CafeContext';
+import { generateSingleQRPdf, generateBulkQRZip } from '../../utils/qrGenerator';
+import { exportOrdersCSV, exportPaymentsCSV, exportCrmCSV } from '../../utils/csvExporter';
 
 export default function OwnerDashboard() {
   const {
@@ -19,7 +21,8 @@ export default function OwnerDashboard() {
     addNewTable,
     regenerateTableQR,
     addStaff,
-    updateCafeProfile
+    updateCafeProfile,
+    getShiftHistory
   } = useCafe();
 
   const [activeTab, setActiveTab] = useState('analytics');
@@ -77,20 +80,20 @@ export default function OwnerDashboard() {
 
   // CSV Exporter for CRM
   const handleExportCRM = () => {
-    const headers = ['Name,Mobile,Visits,Total Spend,Points,Last Visit,Favorites\n'];
-    const rows = Object.values(crm).map(c => 
-      `"${c.name}","${c.mobile}",${c.visits},${c.totalSpend},${c.points},"${c.lastVisit}","${c.favorites.join(' | ')}"`
-    );
-    const blob = new Blob([headers.concat(rows.join('\n'))], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'CafeOS_CRM_Export.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportCrmCSV(crm);
   };
+
+  const [shiftLogs, setShiftLogs] = useState([]);
+  
+  useEffect(() => {
+    if (activeTab === 'system') {
+      getShiftHistory().then(res => {
+        if (res.success && res.data) {
+          setShiftLogs(res.data);
+        }
+      });
+    }
+  }, [activeTab]);
 
   // Staff creation state
   const [showStaffModal, setShowStaffModal] = useState(false);
@@ -429,6 +432,9 @@ export default function OwnerDashboard() {
                 <h1 style={{ fontSize: '32px', color: 'var(--color-text-primary)', marginBottom: '8px' }}>QR Management System</h1>
                 <p style={{ fontSize: '15px', color: 'var(--color-text-secondary)' }}>Generate and print scannable QR cards linked to physical tables.</p>
               </div>
+              <button className="btn-secondary" onClick={async () => { await generateBulkQRZip(tables, cafeProfile); }} style={{ marginRight: '8px' }}>
+                📦 Download All QR Pack
+              </button>
               <button className="btn-primary" onClick={addNewTable}>
                 ➕ Add Table & Auto-QR
               </button>
@@ -457,7 +463,7 @@ export default function OwnerDashboard() {
                   </div>
 
                   <div style={{ width: '100%', display: 'flex', gap: '8px' }}>
-                    <button className="btn-secondary" onClick={() => alert(`Downloading Print PDF package for ${table.name}`)} style={{ flex: 1, fontSize: '12px', padding: '8px', justifyContent: 'center' }}>
+                    <button className="btn-secondary" onClick={async () => { await generateSingleQRPdf(table, cafeProfile); }} style={{ flex: 1, fontSize: '12px', padding: '8px', justifyContent: 'center' }}>
                       💾 PDF
                     </button>
                     <button className="btn-danger" onClick={() => {
@@ -811,8 +817,42 @@ export default function OwnerDashboard() {
             <div className="premium-card" style={{ padding: '32px' }}>
               <h3 style={{ marginBottom: '16px', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>Data Exports</h3>
               <div style={{ display: 'flex', gap: '16px' }}>
-                <button className="btn-secondary" onClick={() => alert('Exporting all orders CSV...')}>📥 Export Orders</button>
-                <button className="btn-secondary" onClick={() => alert('Exporting all payments CSV...')}>📥 Export Payments</button>
+                <button className="btn-secondary" onClick={() => exportOrdersCSV(orders, tables)}>📥 Export Orders</button>
+                <button className="btn-secondary" onClick={() => exportPaymentsCSV(payments)}>📥 Export Payments</button>
+              </div>
+            </div>
+
+            <div className="premium-card" style={{ padding: '32px' }}>
+              <h3 style={{ marginBottom: '16px', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>Shift Audits</h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--color-bg-base)', borderBottom: '1px solid var(--color-border)' }}>
+                      <th style={{ padding: '12px 16px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Date</th>
+                      <th style={{ padding: '12px 16px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Staff Name</th>
+                      <th style={{ padding: '12px 16px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Transactions</th>
+                      <th style={{ padding: '12px 16px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Expected (₹)</th>
+                      <th style={{ padding: '12px 16px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Actual (₹)</th>
+                      <th style={{ padding: '12px 16px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Variance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shiftLogs.length === 0 ? (
+                      <tr><td colSpan="6" style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)' }}>No shift logs found.</td></tr>
+                    ) : shiftLogs.map(log => (
+                      <tr key={log.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                        <td style={{ padding: '12px 16px' }}>{new Date(log.created_at).toLocaleString()}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: '600' }}>{log.staff_name}</td>
+                        <td style={{ padding: '12px 16px' }}>{log.total_transactions}</td>
+                        <td style={{ padding: '12px 16px' }}>₹{log.expected_cash}</td>
+                        <td style={{ padding: '12px 16px' }}>₹{log.actual_cash}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: 'bold', color: log.variance < 0 ? 'var(--color-danger)' : log.variance > 0 ? 'var(--color-success)' : 'inherit' }}>
+                          {log.variance > 0 ? '+' : ''}₹{log.variance}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

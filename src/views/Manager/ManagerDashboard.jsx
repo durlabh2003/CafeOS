@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useCafe } from '../../context/CafeContext';
+import { generateSingleQRPdf } from '../../utils/qrGenerator';
 
 export default function ManagerDashboard() {
   const {
@@ -11,6 +12,8 @@ export default function ManagerDashboard() {
     crm,
     staff,
     addStaff,
+    updateStaff,
+    deactivateStaff,
     addMenuItem,
     updateMenuItem,
     deleteMenuItem
@@ -34,6 +37,25 @@ export default function ManagerDashboard() {
   });
 
   const categories = ['All', ...new Set(menu.map(item => item.category))];
+
+  // Staff management state
+  const [showStaffModal, setShowStaffModal] = useState(false);
+  const [staffModalMode, setStaffModalMode] = useState('add');
+  const [editingStaffId, setEditingStaffId] = useState(null);
+  const [staffForm, setStaffForm] = useState({ name: '', role: 'Counter Operator', email: '', phone: '' });
+
+  const handleStaffSubmit = async (e) => {
+    e.preventDefault();
+    if (!staffForm.name) return;
+    if (staffModalMode === 'edit' && editingStaffId) {
+      await updateStaff(editingStaffId, staffForm);
+    } else {
+      await addStaff(staffForm);
+    }
+    setShowStaffModal(false);
+    setStaffForm({ name: '', role: 'Counter Operator', email: '', phone: '' });
+    setEditingStaffId(null);
+  };
 
   const handleSaveItem = (e) => {
     e.preventDefault();
@@ -251,7 +273,7 @@ export default function ManagerDashboard() {
                   </div>
 
                   <div style={{ width: '100%', display: 'flex', gap: '8px' }}>
-                    <button className="btn-secondary" onClick={() => alert(`Downloading Print PDF package for ${table.name}`)} style={{ flex: 1, fontSize: '12px', padding: '8px', justifyContent: 'center' }}>
+                    <button className="btn-secondary" onClick={async () => { await generateSingleQRPdf(table, cafeProfile); }} style={{ flex: 1, fontSize: '12px', padding: '8px', justifyContent: 'center' }}>
                       💾 PDF
                     </button>
                     <button className="btn-secondary" disabled style={{ fontSize: '12px', padding: '8px 12px', opacity: 0.5, cursor: 'not-allowed' }} title="Invalidation requires Owner role permissions">
@@ -352,25 +374,28 @@ export default function ManagerDashboard() {
                 <h1 style={{ fontSize: '32px', color: 'var(--color-text-primary)', marginBottom: '8px' }}>Staff Accounts</h1>
                 <p style={{ fontSize: '15px', color: 'var(--color-text-secondary)' }}>Manage employee roles, access, and passwords.</p>
               </div>
-              <button className="btn-primary" onClick={() => alert('Add Staff modal would open here')}>
+              <button className="btn-primary" onClick={() => { setStaffModalMode('add'); setStaffForm({ name: '', role: 'Counter Operator', email: '', phone: '' }); setShowStaffModal(true); }}>
                 ➕ Add Staff Member
               </button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
               {staff.map(s => (
-                <div key={s.id} className="premium-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div key={s.id} className="premium-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px', opacity: s.status === 'Inactive' ? 0.5 : 1 }}>
                   <div className="flex-between">
                     <span style={{ fontSize: '18px', fontWeight: '800' }}>{s.name}</span>
-                    <span className={`badge ${s.role === 'Owner' ? 'badge-danger' : s.role === 'Manager' ? 'badge-warning' : 'badge-info'}`}>
-                      {s.role}
+                    <span className={`badge ${s.status === 'Inactive' ? 'badge-danger' : s.role === 'Owner' ? 'badge-danger' : s.role === 'Manager' ? 'badge-warning' : 'badge-info'}`}>
+                      {s.status === 'Inactive' ? 'Inactive' : s.role}
                     </span>
                   </div>
-                  <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>Email: {s.email}</div>
+                  {s.email && <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>Email: {s.email}</div>}
+                  {s.phone && <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>Phone: {s.phone}</div>}
                   
                   <div style={{ display: 'flex', gap: '12px', borderTop: '1px solid var(--color-border)', paddingTop: '16px', marginTop: 'auto' }}>
-                    <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center', fontSize: '12px' }}>✏️ Edit</button>
-                    <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center', fontSize: '12px' }}>🔑 Reset Pwd</button>
+                    <button className="btn-secondary" onClick={() => { setStaffModalMode('edit'); setEditingStaffId(s.id); setStaffForm({ name: s.name, role: s.role, email: s.email || '', phone: s.phone || '' }); setShowStaffModal(true); }} style={{ flex: 1, justifyContent: 'center', fontSize: '12px' }}>✏️ Edit</button>
+                    {s.status !== 'Inactive' && (
+                      <button className="btn-danger" onClick={() => { if (confirm(`Deactivate ${s.name}? They won't be able to log in.`)) deactivateStaff(s.id); }} style={{ fontSize: '12px' }}>🚫</button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -479,6 +504,83 @@ export default function ManagerDashboard() {
                 </button>
                 <button type="submit" className="btn-primary">
                   Save Item
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ADD/EDIT STAFF MODAL --- */}
+      {showStaffModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.4)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(8px)'
+        }}>
+          <div className="premium-card animate-scale-in" style={{ width: '420px', padding: '40px' }}>
+            <h2 style={{ fontSize: '24px', color: 'var(--color-text-primary)', marginBottom: '24px' }}>
+              {staffModalMode === 'edit' ? '✏️ Edit Staff Account' : '👔 Create Staff Account'}
+            </h2>
+            
+            <form onSubmit={handleStaffSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Staff Full Name</label>
+                <input
+                  type="text"
+                  value={staffForm.name}
+                  onChange={(e) => setStaffForm({ ...staffForm, name: e.target.value })}
+                  placeholder="e.g. Vikas Sharma"
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Role Assignment</label>
+                <select
+                  value={staffForm.role}
+                  onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })}
+                >
+                  <option value="Counter Operator">Counter Operator / Cashier</option>
+                  <option value="Kitchen Staff">Kitchen Staff / Chef</option>
+                  <option value="Manager">Manager</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Email (Optional)</label>
+                <input
+                  type="email"
+                  value={staffForm.email}
+                  onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
+                  placeholder="e.g. vikas@cafeos.com"
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Phone (Optional)</label>
+                <input
+                  type="tel"
+                  value={staffForm.phone}
+                  onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })}
+                  placeholder="e.g. 9876543210"
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '16px', marginTop: '24px', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn-secondary" onClick={() => setShowStaffModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary">
+                  {staffModalMode === 'edit' ? 'Save Changes' : 'Create Account'}
                 </button>
               </div>
             </form>
