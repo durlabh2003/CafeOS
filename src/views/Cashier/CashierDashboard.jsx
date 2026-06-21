@@ -30,6 +30,11 @@ export default function CashierDashboard() {
   const [orderNotes, setOrderNotes] = useState('');
   const [orderCategory, setOrderCategory] = useState('All');
   const [orderSearch, setOrderSearch] = useState('');
+  
+  // Order Edit Window
+  const [pendingCart, setPendingCart] = useState(null);
+  const [pendingNotes, setPendingNotes] = useState('');
+  const [editTimer, setEditTimer] = useState(0);
 
   const [discountPercent, setDiscountPercent] = useState(0);
   const [redeemedPoints, setRedeemedPoints] = useState(0);
@@ -80,6 +85,34 @@ export default function CashierDashboard() {
   }, [orders, tables]);
 
   const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
+
+  // Timer effect for Order Edit Window
+  useEffect(() => {
+    let interval;
+    if (editTimer > 0) {
+      interval = setInterval(() => {
+        setEditTimer(prev => prev - 1);
+      }, 1000);
+    } else if (editTimer === 0 && pendingCart) {
+      executePlaceOrder();
+    }
+    return () => clearInterval(interval);
+  }, [editTimer, pendingCart]);
+
+  // If table selection changes, auto-confirm any pending order
+  useEffect(() => {
+    if (pendingCart && editTimer > 0) {
+      executePlaceOrder();
+      setEditTimer(0);
+    }
+  }, [selectedTableId]);
+
+  const executePlaceOrder = () => {
+    const sessionMobile = tables.find(t => t.id === selectedTableId)?.currentSession?.mobile || '+91 99999 99999';
+    placeOrder(selectedTableId, sessionMobile, pendingCart, pendingNotes, 'Counter');
+    setPendingCart(null);
+    setPendingNotes('');
+  };
 
   const selectedTable = tables.find(t => t.id === selectedTableId);
   const activeTableOrders = selectedTableId
@@ -143,11 +176,25 @@ export default function CashierDashboard() {
       return;
     }
 
-    const sessionMobile = selectedTable?.currentSession?.mobile || '+91 99999 99999';
-    placeOrder(selectedTableId, sessionMobile, posCart, orderNotes, 'Dine-In');
+    // Start 30-second edit window
+    setPendingCart([...posCart]);
+    setPendingNotes(orderNotes);
     setPosCart([]);
     setOrderNotes('');
-    setIsOrdering(false);
+    setEditTimer(30);
+  };
+
+  const handleCancelPending = () => {
+    setPosCart(pendingCart);
+    setOrderNotes(pendingNotes);
+    setPendingCart(null);
+    setPendingNotes('');
+    setEditTimer(0);
+  };
+
+  const handleConfirmPendingNow = () => {
+    executePlaceOrder();
+    setEditTimer(0);
   };
 
   const handleOpenBilling = () => {
@@ -392,7 +439,33 @@ export default function CashierDashboard() {
                 </button>
               </div>
 
-              {selectedTable.status === 'Available' && !isOrdering && (
+              {pendingCart && (
+                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
+                  <div style={{ background: '#eff6ff', padding: '16px 24px', border: '1px solid #bfdbfe', borderRadius: '16px' }}>
+                    <div className="flex-between" style={{ marginBottom: '8px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '800', color: '#1e3a8a' }}>⏳ Pending confirmation...</span>
+                      <span style={{ fontSize: '14px', fontWeight: '800', color: '#2563eb' }}>{editTimer}s</span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#3b82f6', marginBottom: '16px' }}>Holding order to allow edits. It will auto-send to the kitchen in {editTimer}s.</p>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', maxHeight: '150px', overflowY: 'auto' }}>
+                      {pendingCart.map((it, idx) => (
+                        <div key={idx} className="flex-between" style={{ fontSize: '13px', color: '#1e3a8a', fontWeight: '500' }}>
+                          <span>{it.name} <span style={{ opacity: 0.6 }}>x{it.qty}</span></span>
+                          <span style={{ fontWeight: '700' }}>₹{it.price * it.qty}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={handleCancelPending} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #3b82f6', background: '#ffffff', color: '#2563eb', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>Edit Items</button>
+                      <button onClick={handleConfirmPendingNow} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: '#2563eb', color: '#ffffff', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>Send Now</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!pendingCart && selectedTable.status === 'Available' && !isOrdering && (
                 <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   <div className="premium-card" style={{ padding: '24px' }}>
                     <h4 style={{ fontSize: '16px', color: 'var(--color-text-primary)', marginBottom: '16px' }}>👤 Check-In Customer</h4>
@@ -428,7 +501,7 @@ export default function CashierDashboard() {
                 </div>
               )}
 
-              {isOrdering && (
+              {!pendingCart && isOrdering && (
                 <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
                   <div className="flex-between">
                     <h4 style={{ fontSize: '18px', color: 'var(--color-text-primary)', fontWeight: '800' }}>🍔 Add Items</h4>
@@ -508,7 +581,7 @@ export default function CashierDashboard() {
                 </div>
               )}
 
-              {selectedTable.status === 'Occupied' && !isOrdering && (
+              {!pendingCart && selectedTable.status === 'Occupied' && !isOrdering && (
                 <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px', flex: 1 }}>
                   <div className="premium-card" style={{ padding: '20px', background: 'var(--color-bg-base)', borderColor: 'var(--color-border)' }}>
                     <div className="flex-between" style={{ marginBottom: '8px' }}>

@@ -37,7 +37,13 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [specialInstructions, setSpecialInstructions] = useState('');
+  
+  // Order Edit Window
+  const [pendingCart, setPendingCart] = useState(null);
+  const [pendingInstructions, setPendingInstructions] = useState('');
+  const [editTimer, setEditTimer] = useState(0);
 
   // Item customization drawer
   const [customizingItem, setCustomizingItem] = useState(null);
@@ -76,6 +82,15 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
       setIsVerifying(false);
       setSentCode(null);
       setOtpCode('');
+      setShowAuthModal(false);
+      
+      // Auto-place into edit window after verification
+      setPendingCart([...cart]);
+      setPendingInstructions(specialInstructions);
+      setCart([]);
+      setSpecialInstructions('');
+      setShowCart(false);
+      setEditTimer(30);
     } else {
       alert('Invalid OTP! Check the floating toast at the bottom right of your screen.');
     }
@@ -135,12 +150,73 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
     }).filter(Boolean));
   };
 
-  const handlePlaceOrder = () => {
+  const getUpsellRecommendation = () => {
+    if (cart.length === 0) return null;
+    for (const cartItem of cart) {
+      const menuItem = menu.find(m => m.id === cartItem.id);
+      if (menuItem && menuItem.upsellItemId) {
+        const alreadyInCart = cart.find(c => c.id === menuItem.upsellItemId);
+        if (!alreadyInCart) {
+          const upsellItem = menu.find(m => m.id === menuItem.upsellItemId && m.status === 'Active');
+          if (upsellItem) return upsellItem;
+        }
+      }
+    }
+    return null;
+  };
+
+  const recommendedUpsell = getUpsellRecommendation();
+
+  // Timer effect for Order Edit Window
+  useEffect(() => {
+    let interval;
+    if (editTimer > 0) {
+      interval = setInterval(() => {
+        setEditTimer(prev => prev - 1);
+      }, 1000);
+    } else if (editTimer === 0 && pendingCart) {
+      // Timer expired, actually place the order
+      executePlaceOrder();
+    }
+    return () => clearInterval(interval);
+  }, [editTimer, pendingCart]);
+
+  const executePlaceOrder = () => {
+    placeOrder(tableId, sessionMobile || activeCustomerSessions[tableId], pendingCart, pendingInstructions, 'Dine-In');
+    setPendingCart(null);
+    setPendingInstructions('');
+  };
+
+  const handlePlaceOrderClick = () => {
     if (cart.length === 0) return;
-    placeOrder(tableId, sessionMobile, cart, specialInstructions, 'Dine-In');
+    
+    if (!isSessionActive) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    // Start 30-second edit window
+    setPendingCart([...cart]);
+    setPendingInstructions(specialInstructions);
     setCart([]);
     setSpecialInstructions('');
     setShowCart(false);
+    setEditTimer(30);
+  };
+
+  const handleCancelPending = () => {
+    // Restore cart to edit
+    setCart(pendingCart);
+    setSpecialInstructions(pendingInstructions);
+    setPendingCart(null);
+    setPendingInstructions('');
+    setEditTimer(0);
+    setShowCart(true);
+  };
+
+  const handleConfirmPendingNow = () => {
+    executePlaceOrder();
+    setEditTimer(0);
   };
 
   const handleToggleAddOn = (add) => {
@@ -248,97 +324,9 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
           </div>
         )}
 
-        {/* --- CASE 2: OTP LOG IN --- */}
-        {tableId && !isSessionActive && (
-          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#ffffff', padding: '64px 32px 32px' }}>
-            <div style={{ marginTop: '16px' }}>
-              <button onClick={() => { setTableId(null); if (onExit) onExit(); }} style={{ fontSize: '14px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>← Change Table</button>
-            </div>
-            
-            <div style={{ margin: 'auto 0' }}>
-              <div style={{ fontSize: '40px', marginBottom: '16px' }}>☕</div>
-              <h2 style={{ fontSize: '28px', color: 'var(--color-text-primary)', fontWeight: '800', marginBottom: '8px' }}>Table {tableId.slice(-2)} Session</h2>
-              <p style={{ fontSize: '15px', color: 'var(--color-text-secondary)', marginBottom: '32px' }}>Enter details to access menu.</p>
-
-              {!isVerifying ? (
-                <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-secondary)' }}>Your Name (Optional)</span>
-                    <input
-                      type="text"
-                      placeholder="e.g. Aarav Sharma"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      style={{ fontSize: '16px', padding: '14px 16px', borderRadius: '12px' }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-secondary)' }}>Mobile Number *</span>
-                    <input
-                      type="tel"
-                      placeholder="e.g. 98765 43210"
-                      value={mobileNum}
-                      onChange={(e) => setMobileNum(e.target.value)}
-                      required
-                      style={{ fontSize: '16px', padding: '14px 16px', borderRadius: '12px' }}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="btn-primary"
-                    style={{ background: 'var(--color-customer)', padding: '16px', borderRadius: '12px', fontSize: '16px', marginTop: '16px', justifyContent: 'center' }}
-                  >
-                    Request SMS Code
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'center', marginBottom: '16px' }}>
-                    <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>Code sent to <strong style={{ color: 'var(--color-text-primary)' }}>{mobileNum}</strong></span>
-                    <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: '1.5' }}>Check the notification toast at the bottom right of the screen.</p>
-                  </div>
-
-                  <input
-                    type="text"
-                    placeholder="• • • • • •"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                    maxLength="6"
-                    required
-                    style={{ fontSize: '24px', letterSpacing: '0.3em', textAlign: 'center', padding: '16px', borderRadius: '12px' }}
-                  />
-
-                  <button
-                    type="submit"
-                    className="btn-primary"
-                    style={{ background: 'var(--color-success)', padding: '16px', borderRadius: '12px', fontSize: '16px', justifyContent: 'center' }}
-                  >
-                    Verify & Browse Menu
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsVerifying(false)}
-                    style={{ color: 'var(--color-danger)', fontSize: '14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'center', fontWeight: '600', padding: '8px' }}
-                  >
-                    Go Back
-                  </button>
-                </form>
-              )}
-            </div>
-
-            <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--color-text-muted)', marginTop: 'auto', paddingBottom: '16px' }}>
-              By logging in, you earn loyalty points on this order automatically.
-            </div>
-          </div>
-        )}
-
-        {/* --- CASE 3: ACTIVE CUSTOMER MENU --- */}
-        {isSessionActive && (
+        {/* --- CASE 2: ACTIVE MENU BROWSER (Guest or Verified) --- */}
+        {tableId && (
           <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#ffffff' }}>
-            
             {/* Customer view Header */}
             <div style={{
               padding: '60px 24px 16px',
@@ -355,19 +343,33 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
                 <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>📍 Table {tableId.slice(-2)}</span>
               </div>
               
-              <button
-                onClick={() => {
-                  if (confirm('Logout of menu session? Cart will be cleared.')) {
-                    logoutCustomerSession(tableId);
+              {isSessionActive ? (
+                <button
+                  onClick={() => {
+                    if (confirm('Logout of menu session? Cart will be cleared.')) {
+                      logoutCustomerSession(tableId);
+                      setCart([]);
+                      if (onExit) onExit();
+                    }
+                  }}
+                  className="btn-danger"
+                  style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '99px' }}
+                >
+                  Logout
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setTableId(null);
                     setCart([]);
                     if (onExit) onExit();
-                  }
-                }}
-                className="btn-danger"
-                style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '99px' }}
-              >
-                Logout
-              </button>
+                  }}
+                  className="btn-secondary"
+                  style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '99px' }}
+                >
+                  Change Table
+                </button>
+              )}
             </div>
 
             {/* Tracker */}
@@ -413,6 +415,21 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* Pending Order / Edit Window */}
+            {pendingCart && (
+              <div style={{ background: '#eff6ff', padding: '16px 24px', borderBottom: '1px solid #bfdbfe' }}>
+                <div className="flex-between" style={{ marginBottom: '8px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '800', color: '#1e3a8a' }}>⏳ Order confirmation...</span>
+                  <span style={{ fontSize: '14px', fontWeight: '800', color: '#2563eb' }}>{editTimer}s</span>
+                </div>
+                <p style={{ fontSize: '12px', color: '#3b82f6', marginBottom: '12px' }}>Sending to kitchen in {editTimer}s. You can edit or confirm now.</p>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={handleCancelPending} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #3b82f6', background: '#ffffff', color: '#2563eb', fontSize: '12px', fontWeight: '700' }}>Edit Order</button>
+                  <button onClick={handleConfirmPendingNow} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', background: '#2563eb', color: '#ffffff', fontSize: '12px', fontWeight: '700' }}>Confirm Now</button>
                 </div>
               </div>
             )}
@@ -542,6 +559,22 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
                     ))}
                   </div>
 
+                  {recommendedUpsell && (
+                    <div style={{ background: '#fffbeb', border: '1px dashed #fcd34d', padding: '12px 16px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: '800', color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Goes great with</div>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--color-text-primary)' }}>{recommendedUpsell.name}</div>
+                        <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>+₹{recommendedUpsell.price}</div>
+                      </div>
+                      <button
+                        onClick={() => handleAddToCartClick(recommendedUpsell)}
+                        style={{ background: 'var(--color-customer)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '99px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
                     <span style={{ fontSize: '13px', color: 'var(--color-text-primary)', fontWeight: '600' }}>Special Instructions</span>
                     <textarea
@@ -555,7 +588,7 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
 
                   <button
                     className="btn-primary"
-                    onClick={handlePlaceOrder}
+                    onClick={handlePlaceOrderClick}
                     style={{ width: '100%', background: 'var(--color-customer)', padding: '16px', borderRadius: '16px', fontSize: '16px', justifyContent: 'center', marginTop: '16px' }}
                   >
                     🚀 Confirm & Send to Kitchen
@@ -653,6 +686,79 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
                   >
                     Add to Cart
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* OTP AUTH MODAL */}
+            {showAuthModal && (
+              <div style={{
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(15, 23, 42, 0.6)',
+                zIndex: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(4px)'
+              }}>
+                <div className="animate-scale-in" style={{ width: '90%', background: '#ffffff', borderRadius: '24px', padding: '32px 24px', display: 'flex', flexDirection: 'column' }}>
+                  <div className="flex-between" style={{ marginBottom: '24px' }}>
+                    <h3 style={{ fontSize: '20px', color: 'var(--color-text-primary)', fontWeight: '800' }}>Verify to Order</h3>
+                    <button onClick={() => setShowAuthModal(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+                  </div>
+                  
+                  <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', marginBottom: '24px' }}>Please enter your details to confirm your table order and earn loyalty points.</p>
+
+                  {!isVerifying ? (
+                    <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-secondary)' }}>Your Name (Optional)</span>
+                        <input
+                          type="text"
+                          placeholder="e.g. Aarav Sharma"
+                          value={customerName}
+                          onChange={(e) => setCustomerName(e.target.value)}
+                          style={{ fontSize: '16px', padding: '12px', borderRadius: '12px', border: '1px solid var(--color-border)' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-secondary)' }}>Mobile Number *</span>
+                        <input
+                          type="tel"
+                          placeholder="e.g. 98765 43210"
+                          value={mobileNum}
+                          onChange={(e) => setMobileNum(e.target.value)}
+                          required
+                          style={{ fontSize: '16px', padding: '12px', borderRadius: '12px', border: '1px solid var(--color-border)' }}
+                        />
+                      </div>
+                      <button type="submit" className="btn-primary" style={{ background: 'var(--color-customer)', padding: '16px', borderRadius: '12px', fontSize: '16px', justifyContent: 'center', marginTop: '8px' }}>
+                        Request SMS Code
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>Code sent to <strong>{mobileNum}</strong></span>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="• • • • • •"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        maxLength="6"
+                        required
+                        style={{ fontSize: '24px', letterSpacing: '0.3em', textAlign: 'center', padding: '16px', borderRadius: '12px', border: '1px solid var(--color-border)' }}
+                      />
+                      <button type="submit" className="btn-primary" style={{ background: 'var(--color-success)', padding: '16px', borderRadius: '12px', fontSize: '16px', justifyContent: 'center' }}>
+                        Verify & Send Order
+                      </button>
+                      <button type="button" onClick={() => setIsVerifying(false)} style={{ color: 'var(--color-danger)', fontSize: '14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'center', fontWeight: '600', padding: '8px' }}>
+                        Go Back
+                      </button>
+                    </form>
+                  )}
                 </div>
               </div>
             )}

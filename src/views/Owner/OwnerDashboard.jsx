@@ -144,6 +144,7 @@ export default function OwnerDashboard() {
       price: '',
       image: '',
       status: 'Active',
+      upsellItemId: '',
       variants: [],
       addOns: []
     });
@@ -934,6 +935,20 @@ export default function OwnerDashboard() {
                   onChange={(e) => setItemForm({ ...itemForm, image: e.target.value })}
                   placeholder="Paste Unsplash image URL..."
                 />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Upsell Pairing (Optional)</label>
+                <select
+                  value={itemForm.upsellItemId || ''}
+                  onChange={(e) => setItemForm({ ...itemForm, upsellItemId: e.target.value || null })}
+                >
+                  <option value="">-- None --</option>
+                  {menu.filter(m => m.id !== itemForm.id && m.status === 'Active').map(m => (
+                    <option key={m.id} value={m.id}>{m.name} (+₹{m.price})</option>
+                  ))}
+                </select>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Suggests this item when added to cart</span>
               </div>
 
               <div style={{ display: 'flex', gap: '16px', marginTop: '24px', justifyContent: 'flex-end' }}>

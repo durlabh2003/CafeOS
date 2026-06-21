@@ -94,6 +94,7 @@ export const CafeProvider = ({ children }) => {
             return {
               ...item,
               category: cat ? cat.name : 'Uncategorized',
+              upsellItemId: item.upsell_item_id || null,
               addOns: []
             };
           });
@@ -373,7 +374,8 @@ export const CafeProvider = ({ children }) => {
       description: item.description,
       price: item.price,
       image: item.image,
-      status: item.status || 'Active'
+      status: item.status || 'Active',
+      upsell_item_id: item.upsellItemId || null
     };
     const inserted = await supabase.from('menu_items').insert(newItem).select().single();
     if(inserted.data) {
@@ -395,7 +397,8 @@ export const CafeProvider = ({ children }) => {
       description: updatedItem.description,
       price: updatedItem.price,
       image: updatedItem.image,
-      status: updatedItem.status
+      status: updatedItem.status,
+      upsell_item_id: updatedItem.upsellItemId || null
     };
     await supabase.from('menu_items').update(data).eq('id', updatedItem.id);
     setMenu(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
