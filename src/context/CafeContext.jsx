@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../config/supabaseClient';
 
 const CafeContext = createContext();
@@ -43,6 +44,23 @@ export const CafeProvider = ({ children }) => {
   const [vendors, setVendors] = useState([]);
   const [analyticsEvents, setAnalyticsEvents] = useState([]);
 
+  // Multi-Branch Support
+  const [availableBranches] = useState([
+    { id: 'B1', name: 'Downtown Branch', logo: '☕' },
+    { id: 'B2', name: 'Airport Kiosk', logo: '✈️' }
+  ]);
+  const [activeBranch, setActiveBranch] = useState(() => {
+    const saved = localStorage.getItem('cafe_active_branch');
+    return saved ? JSON.parse(saved) : { id: 'B1', name: 'Downtown Branch', logo: '☕' };
+  });
+
+  const switchBranch = (branch) => {
+    setActiveBranch(branch);
+    localStorage.setItem('cafe_active_branch', JSON.stringify(branch));
+    // Simulate loading data for new branch
+    window.location.reload();
+  };
+
   useEffect(() => {
     if (currentStaff) {
       localStorage.setItem('cafe_current_staff', JSON.stringify(currentStaff));
@@ -76,19 +94,17 @@ export const CafeProvider = ({ children }) => {
           supabase.from('analytics_events').select('*').order('created_at', { ascending: false })
         ]);
 
-        let cafeId = null;
         if (cafesRes.data && cafesRes.data.length > 0) {
           const cafe = cafesRes.data[0];
-          cafeId = cafe.id;
           const settings = settingsRes.data && settingsRes.data.length > 0 ? settingsRes.data[0] : {};
           setCafeProfile(prev => ({ 
             ...prev, 
             id: cafe.id, 
-            name: cafe.name,
+            name: activeBranch.id === 'B2' ? 'CaféOS Airport' : cafe.name,
             phone: cafe.phone,
-            address: cafe.address,
+            address: activeBranch.id === 'B2' ? 'Terminal 2, Arrivals' : cafe.address,
             gstNumber: cafe.gstin,
-            logo: cafe.logo_url || '☕',
+            logo: activeBranch.logo || cafe.logo_url || '☕',
             theme: cafe.theme || 'light',
             currency: settings.currency || '₹',
             gstPercentage: settings.gst_percentage || 5,
@@ -111,6 +127,11 @@ export const CafeProvider = ({ children }) => {
           });
           setMenu(mappedMenu);
         }
+
+        if (invRes.data) setInventoryItems(invRes.data);
+        if (recRes.data) setRecipes(recRes.data);
+        if (venRes.data) setVendors(venRes.data);
+        if (anaRes.data) setAnalyticsEvents(anaRes.data);
 
         if (tablesRes.data) {
           setTables(tablesRes.data.map(t => ({ ...t, currentSession: t.current_session })));
@@ -171,15 +192,14 @@ export const CafeProvider = ({ children }) => {
 
     fetchData();
 
-    // Simplified realtime for MVP Adapter
     const ordersSubscription = supabase.channel('public:orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, payload => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
         fetchData(); // Brute force refresh to get nested items easily for adapter
       })
       .subscribe();
 
     const tablesSubscription = supabase.channel('public:tables')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, payload => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, () => {
         fetchData();
       })
       .subscribe();
@@ -323,11 +343,10 @@ export const CafeProvider = ({ children }) => {
     return { ordersList: tableOrders, subtotal, gstRate, gstAmount, grandTotal };
   };
 
-  const checkoutSession = async (tableId, paymentModes, totalCollected, discountAmount = 0, redeemedPoints = 0) => {
+  const checkoutSession = async (tableId, paymentModes, totalCollected, discountAmount = 0) => {
     const table = tables.find(t => t.id === tableId);
     if (!table || !table.currentSession) return;
 
-    const { mobile } = table.currentSession;
     const billDetails = getConsolidatedBill(tableId);
     const netAmount = Math.max(0, billDetails.grandTotal - discountAmount);
 
@@ -362,6 +381,47 @@ export const CafeProvider = ({ children }) => {
     
     // Refresh entirely
     window.location.reload(); 
+  };
+
+  const processOnlinePayment = async (tableId, paymentMode, transactionId) => {
+    const table = tables.find(t => t.id === tableId);
+    if (!table || !table.currentSession) return { success: false, message: 'No active session found.' };
+
+    const billDetails = getConsolidatedBill(tableId);
+    if (billDetails.ordersList.length === 0) return { success: false, message: 'No pending orders.' };
+
+    try {
+      const billRes = await supabase.from('bills').insert({
+        subtotal: billDetails.subtotal,
+        tax: billDetails.gstAmount,
+        discount: 0,
+        grand_total: billDetails.grandTotal,
+        status: 'Paid'
+      }).select().single();
+
+      if (billRes.data) {
+        await supabase.from('payments').insert([{
+          bill_id: billRes.data.id,
+          amount: billDetails.grandTotal,
+          mode: paymentMode,
+          collected_by: 'Customer App'
+        }]);
+      }
+
+      // Complete Orders
+      const orderIds = billDetails.ordersList.map(o => o.id);
+      if (orderIds.length > 0) {
+        await supabase.from('orders').update({ status: 'Completed' }).in('id', orderIds);
+      }
+
+      // Free Table
+      await supabase.from('tables').update({ status: 'Available', current_session: null }).eq('id', tableId);
+      
+      return { success: true };
+    } catch (err) {
+      console.error('Online payment error:', err);
+      return { success: false, message: err.message };
+    }
   };
 
   const releaseTable = async (tableId) => {
@@ -513,7 +573,7 @@ export const CafeProvider = ({ children }) => {
     setStaff(prev => prev.map(s => s.id === staffId ? { ...s, status: 'Inactive' } : s));
   };
 
-  const processTakeaway = async (customerMobile, items, notes, paymentModes, totalCollected, discountAmount = 0, redeemedPoints = 0) => {
+  const processTakeaway = async (customerMobile, items, notes, paymentModes, totalCollected, discountAmount = 0) => {
     try {
       // 1. Create takeaway order in Supabase (no table_id)
       const subtotal = items.reduce((acc, it) => acc + (it.price * it.qty), 0);
@@ -664,13 +724,92 @@ export const CafeProvider = ({ children }) => {
     }
   };
 
+  // Sprint 3 functions
+  const addInventoryItem = async (item) => {
+    const inserted = await supabase.from('inventory_items').insert(item).select().single();
+    if (inserted.data) setInventoryItems(prev => [...prev, inserted.data]);
+  };
+
+  const updateInventoryItem = async (id, updates) => {
+    await supabase.from('inventory_items').update(updates).eq('id', id);
+    setInventoryItems(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
+  };
+
+  const addVendor = async (vendor) => {
+    const inserted = await supabase.from('vendors').insert(vendor).select().single();
+    if (inserted.data) setVendors(prev => [...prev, inserted.data]);
+  };
+
+  const updateVendor = async (id, updates) => {
+    await supabase.from('vendors').update(updates).eq('id', id);
+    setVendors(prev => prev.map(v => v.id === id ? { ...v, ...updates } : v));
+  };
+
+  const simulateDeliveryOrder = async (aggregator) => {
+    try {
+      const sampleItems = menu.filter(m => m.status === 'Active').slice(0, 2);
+      if (sampleItems.length === 0) return;
+
+      const orderItems = sampleItems.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        qty: 1,
+        variant_name: '',
+        add_ons: []
+      }));
+
+      const subtotal = orderItems.reduce((acc, it) => acc + (it.price * it.qty), 0);
+      
+      const newOrder = {
+        table_id: null,
+        status: 'New',
+        source: aggregator,
+        notes: `Simulated ${aggregator} incoming webhook`,
+        amount: subtotal
+      };
+
+      const insertedOrder = await supabase.from('orders').insert(newOrder).select().single();
+      if (!insertedOrder.data) return;
+
+      const dbOrderItems = orderItems.map(it => ({
+        order_id: insertedOrder.data.id,
+        item_id: it.id,
+        qty: it.qty,
+        price: it.price,
+        variant_name: it.variant_name
+      }));
+      await supabase.from('order_items').insert(dbOrderItems);
+
+      const uiOrder = {
+        ...newOrder,
+        id: insertedOrder.data.id,
+        tableId: null,
+        table_id: null,
+        sessionMobile: null,
+        timestamp: new Date().toISOString(),
+        items: orderItems,
+        orderNumber: insertedOrder.data.order_number || insertedOrder.data.id
+      };
+      
+      setOrders(prev => [uiOrder, ...prev]);
+      playKdsChime();
+    } catch (err) {
+      console.error('Delivery webhook simulation error:', err);
+    }
+  };
+
   return (
     <CafeContext.Provider value={{
+      loading, playKdsChime,
+      availableBranches, activeBranch, switchBranch,
       currentStaff, loginStaff, logoutStaff,
       cafeProfile, setCafeProfile, menu, tables, crm, payments, orders, staff, otpNotifications, activeCustomerSessions,
-      triggerOtpSms, verifyOtp, logoutCustomerSession, placeOrder, updateOrderStatus, getConsolidatedBill, checkoutSession,
+      inventoryItems, recipes, vendors, analyticsEvents,
+      triggerOtpSms, verifyOtp, logoutCustomerSession, placeOrder, updateOrderStatus, getConsolidatedBill, checkoutSession, processOnlinePayment,
       releaseTable, addMenuItem, updateMenuItem, deleteMenuItem, addNewTable, transferTable, addStaff, updateStaff, deactivateStaff, processTakeaway,
-      updateCafeProfile, regenerateTableQR, closeShift, getShiftHistory, updateTableStatus
+      updateCafeProfile, regenerateTableQR, closeShift, getShiftHistory, updateTableStatus,
+      addInventoryItem, updateInventoryItem, addVendor, updateVendor, simulateDeliveryOrder
     }}>
       {children}
     </CafeContext.Provider>

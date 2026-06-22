@@ -88,7 +88,8 @@ const generateKOTText = (order, tableName) => {
 
 const simulatePrint = (text) => {
   // For development without hardware
-  const cleanText = text.replace(/\x1b[a-zA-Z!][\x00-\x10]?/g, ''); // strip ESC codes
+  // eslint-disable-next-line no-control-regex
+  const cleanText = text.replace(/[\x1b\x00-\x1f\x7f-\x9f]/g, ''); // strip ESC codes
   console.log("%c🖨️ [SIMULATED PRINTER OUTPUT]", "color: #2563eb; font-weight: bold; font-size: 14px;");
   console.log(cleanText);
 };

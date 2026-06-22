@@ -1,4 +1,3 @@
-import React from 'react';
 import { useCafe } from '../context/CafeContext';
 
 export const PersonaSwitcher = ({ currentPersona, setCurrentPersona }) => {

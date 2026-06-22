@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useCafe } from '../../context/CafeContext';
 import { generateSingleQRPdf } from '../../utils/qrGenerator';
 
@@ -16,7 +16,13 @@ export default function ManagerDashboard() {
     deactivateStaff,
     addMenuItem,
     updateMenuItem,
-    deleteMenuItem
+    deleteMenuItem,
+    inventoryItems,
+    vendors,
+    addInventoryItem,
+    updateInventoryItem,
+    addVendor,
+    updateVendor
   } = useCafe();
 
   const [activeTab, setActiveTab] = useState('menu');
@@ -44,6 +50,18 @@ export default function ManagerDashboard() {
   const [editingStaffId, setEditingStaffId] = useState(null);
   const [staffForm, setStaffForm] = useState({ name: '', role: 'Counter Operator', email: '', phone: '' });
 
+  // Inventory management state
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [inventoryModalMode, setInventoryModalMode] = useState('add');
+  const [editingInventoryId, setEditingInventoryId] = useState(null);
+  const [inventoryForm, setInventoryForm] = useState({ name: '', unit: '', current_stock: '', low_stock_threshold: '', unit_cost: '' });
+
+  // Vendor management state
+  const [showVendorModal, setShowVendorModal] = useState(false);
+  const [vendorModalMode, setVendorModalMode] = useState('add');
+  const [editingVendorId, setEditingVendorId] = useState(null);
+  const [vendorForm, setVendorForm] = useState({ name: '', contact: '', email: '', status: 'Active' });
+
   const handleStaffSubmit = async (e) => {
     e.preventDefault();
     if (!staffForm.name) return;
@@ -55,6 +73,33 @@ export default function ManagerDashboard() {
     setShowStaffModal(false);
     setStaffForm({ name: '', role: 'Counter Operator', email: '', phone: '' });
     setEditingStaffId(null);
+  };
+
+  const handleInventorySubmit = async (e) => {
+    e.preventDefault();
+    const data = {
+      name: inventoryForm.name,
+      unit: inventoryForm.unit,
+      current_stock: parseFloat(inventoryForm.current_stock) || 0,
+      low_stock_threshold: parseFloat(inventoryForm.low_stock_threshold) || 0,
+      unit_cost: parseFloat(inventoryForm.unit_cost) || 0,
+    };
+    if (inventoryModalMode === 'edit') {
+      await updateInventoryItem(editingInventoryId, data);
+    } else {
+      await addInventoryItem(data);
+    }
+    setShowInventoryModal(false);
+  };
+
+  const handleVendorSubmit = async (e) => {
+    e.preventDefault();
+    if (vendorModalMode === 'edit') {
+      await updateVendor(editingVendorId, vendorForm);
+    } else {
+      await addVendor(vendorForm);
+    }
+    setShowVendorModal(false);
   };
 
   const handleSaveItem = (e) => {
@@ -110,6 +155,18 @@ export default function ManagerDashboard() {
             </button>
             <button className={`tab-button ${activeTab === 'qr' ? 'active' : ''}`} onClick={() => setActiveTab('qr')}>
               🔲 QR Codes (View)
+            </button>
+          </nav>
+        </div>
+
+        <div>
+          <h2 style={{ fontSize: '13px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', paddingLeft: '12px', marginBottom: '16px', fontWeight: '700' }}>Inventory & Supply</h2>
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button className={`tab-button ${activeTab === 'inventory' ? 'active' : ''}`} onClick={() => setActiveTab('inventory')}>
+              📦 Stock Levels
+            </button>
+            <button className={`tab-button ${activeTab === 'vendors' ? 'active' : ''}`} onClick={() => setActiveTab('vendors')}>
+              🚚 Vendors
             </button>
           </nav>
         </div>
@@ -419,6 +476,98 @@ export default function ManagerDashboard() {
           </div>
         )}
 
+        {/* --- INVENTORY TAB --- */}
+        {activeTab === 'inventory' && (
+          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '1000px', margin: '0 auto' }}>
+            <div className="flex-between">
+              <div>
+                <h1 style={{ fontSize: '32px', color: 'var(--color-text-primary)', marginBottom: '8px' }}>Inventory Management</h1>
+                <p style={{ fontSize: '15px', color: 'var(--color-text-secondary)' }}>Track raw materials and set low stock alerts.</p>
+              </div>
+              <button className="btn-primary" onClick={() => { setInventoryModalMode('add'); setInventoryForm({ name: '', unit: '', current_stock: '', low_stock_threshold: '', unit_cost: '' }); setShowInventoryModal(true); }}>
+                ➕ Add Item
+              </button>
+            </div>
+
+            <div className="premium-card" style={{ overflowX: 'auto', borderRadius: 'var(--radius-lg)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                <thead>
+                  <tr style={{ background: 'var(--color-bg-base)', borderBottom: '1px solid var(--color-border)' }}>
+                    <th style={{ padding: '20px 24px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Item Name</th>
+                    <th style={{ padding: '20px 24px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Unit</th>
+                    <th style={{ padding: '20px 24px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Current Stock</th>
+                    <th style={{ padding: '20px 24px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Low Alert</th>
+                    <th style={{ padding: '20px 24px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Cost (₹)</th>
+                    <th style={{ padding: '20px 24px', color: 'var(--color-text-secondary)', fontWeight: '600', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventoryItems?.map((item) => (
+                    <tr key={item.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '20px 24px', fontWeight: '600', color: 'var(--color-text-primary)' }}>{item.name}</td>
+                      <td style={{ padding: '20px 24px', color: 'var(--color-text-secondary)' }}>{item.unit}</td>
+                      <td style={{ padding: '20px 24px', color: item.current_stock <= item.low_stock_threshold ? 'var(--color-danger)' : 'var(--color-text-secondary)', fontWeight: '600' }}>{item.current_stock}</td>
+                      <td style={{ padding: '20px 24px', color: 'var(--color-text-secondary)' }}>{item.low_stock_threshold}</td>
+                      <td style={{ padding: '20px 24px', color: 'var(--color-text-secondary)' }}>₹{item.unit_cost}</td>
+                      <td style={{ padding: '20px 24px', textAlign: 'right' }}>
+                        <button className="btn-secondary" onClick={() => { setInventoryModalMode('edit'); setEditingInventoryId(item.id); setInventoryForm({ name: item.name, unit: item.unit, current_stock: item.current_stock, low_stock_threshold: item.low_stock_threshold, unit_cost: item.unit_cost }); setShowInventoryModal(true); }} style={{ fontSize: '12px', padding: '6px 12px' }}>✏️ Edit</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {(!inventoryItems || inventoryItems.length === 0) && (
+                    <tr><td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)' }}>No inventory items found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* --- VENDORS TAB --- */}
+        {activeTab === 'vendors' && (
+          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '1000px', margin: '0 auto' }}>
+            <div className="flex-between">
+              <div>
+                <h1 style={{ fontSize: '32px', color: 'var(--color-text-primary)', marginBottom: '8px' }}>Vendors</h1>
+                <p style={{ fontSize: '15px', color: 'var(--color-text-secondary)' }}>Manage supplier contacts and purchase orders.</p>
+              </div>
+              <button className="btn-primary" onClick={() => { setVendorModalMode('add'); setVendorForm({ name: '', contact: '', email: '', status: 'Active' }); setShowVendorModal(true); }}>
+                ➕ Add Vendor
+              </button>
+            </div>
+
+            <div className="premium-card" style={{ overflowX: 'auto', borderRadius: 'var(--radius-lg)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                <thead>
+                  <tr style={{ background: 'var(--color-bg-base)', borderBottom: '1px solid var(--color-border)' }}>
+                    <th style={{ padding: '20px 24px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Vendor Name</th>
+                    <th style={{ padding: '20px 24px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Contact</th>
+                    <th style={{ padding: '20px 24px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Email</th>
+                    <th style={{ padding: '20px 24px', color: 'var(--color-text-secondary)', fontWeight: '600' }}>Status</th>
+                    <th style={{ padding: '20px 24px', color: 'var(--color-text-secondary)', fontWeight: '600', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vendors?.map((v) => (
+                    <tr key={v.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '20px 24px', fontWeight: '600', color: 'var(--color-text-primary)' }}>{v.name}</td>
+                      <td style={{ padding: '20px 24px', color: 'var(--color-text-secondary)' }}>{v.contact}</td>
+                      <td style={{ padding: '20px 24px', color: 'var(--color-text-secondary)' }}>{v.email}</td>
+                      <td style={{ padding: '20px 24px' }}><span className={`badge ${v.status === 'Active' ? 'badge-success' : 'badge-danger'}`}>{v.status}</span></td>
+                      <td style={{ padding: '20px 24px', textAlign: 'right' }}>
+                        <button className="btn-secondary" onClick={() => { setVendorModalMode('edit'); setEditingVendorId(v.id); setVendorForm({ name: v.name, contact: v.contact, email: v.email, status: v.status }); setShowVendorModal(true); }} style={{ fontSize: '12px', padding: '6px 12px' }}>✏️ Edit</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {(!vendors || vendors.length === 0) && (
+                    <tr><td colSpan="4" style={{ padding: '24px', textAlign: 'center', color: 'var(--color-text-muted)' }}>No vendors found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
       </main>
 
       {/* --- ADD/EDIT MENU ITEM MODAL --- */}
@@ -582,6 +731,154 @@ export default function ManagerDashboard() {
                 <button type="submit" className="btn-primary">
                   {staffModalMode === 'edit' ? 'Save Changes' : 'Create Account'}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ADD/EDIT INVENTORY MODAL --- */}
+      {showInventoryModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.4)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)'
+        }}>
+          <div className="premium-card animate-scale-in" style={{ width: '500px', padding: '40px' }}>
+            <h2 style={{ fontSize: '24px', color: 'var(--color-text-primary)', marginBottom: '24px' }}>
+              {inventoryModalMode === 'edit' ? '✏️ Edit Inventory Item' : '➕ Add Inventory Item'}
+            </h2>
+            
+            <form onSubmit={handleInventorySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Item Name</label>
+                <input
+                  type="text"
+                  value={inventoryForm.name}
+                  onChange={(e) => setInventoryForm({ ...inventoryForm, name: e.target.value })}
+                  placeholder="e.g. Coffee Beans (Arabica)"
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '20px' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Unit</label>
+                  <input
+                    type="text"
+                    value={inventoryForm.unit}
+                    onChange={(e) => setInventoryForm({ ...inventoryForm, unit: e.target.value })}
+                    placeholder="e.g. kg, L, pcs"
+                    required
+                  />
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Unit Cost (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={inventoryForm.unit_cost}
+                    onChange={(e) => setInventoryForm({ ...inventoryForm, unit_cost: e.target.value })}
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '20px' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Current Stock</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={inventoryForm.current_stock}
+                    onChange={(e) => setInventoryForm({ ...inventoryForm, current_stock: e.target.value })}
+                    placeholder="0"
+                    required
+                  />
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Low Stock Alert</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={inventoryForm.low_stock_threshold}
+                    onChange={(e) => setInventoryForm({ ...inventoryForm, low_stock_threshold: e.target.value })}
+                    placeholder="0"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '16px', marginTop: '24px', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn-secondary" onClick={() => setShowInventoryModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary">Save Item</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ADD/EDIT VENDOR MODAL --- */}
+      {showVendorModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.4)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)'
+        }}>
+          <div className="premium-card animate-scale-in" style={{ width: '420px', padding: '40px' }}>
+            <h2 style={{ fontSize: '24px', color: 'var(--color-text-primary)', marginBottom: '24px' }}>
+              {vendorModalMode === 'edit' ? '✏️ Edit Vendor' : '➕ Add Vendor'}
+            </h2>
+            
+            <form onSubmit={handleVendorSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Vendor Name</label>
+                <input
+                  type="text"
+                  value={vendorForm.name}
+                  onChange={(e) => setVendorForm({ ...vendorForm, name: e.target.value })}
+                  placeholder="e.g. Best Suppliers Co."
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Contact Number</label>
+                <input
+                  type="tel"
+                  value={vendorForm.contact}
+                  onChange={(e) => setVendorForm({ ...vendorForm, contact: e.target.value })}
+                  placeholder="e.g. 9876543210"
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Email</label>
+                <input
+                  type="email"
+                  value={vendorForm.email}
+                  onChange={(e) => setVendorForm({ ...vendorForm, email: e.target.value })}
+                  placeholder="e.g. sales@vendor.com"
+                />
+              </div>
+
+              {vendorModalMode === 'edit' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Status</label>
+                  <select
+                    value={vendorForm.status}
+                    onChange={(e) => setVendorForm({ ...vendorForm, status: e.target.value })}
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '16px', marginTop: '24px', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn-secondary" onClick={() => setShowVendorModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary">Save Vendor</button>
               </div>
             </form>
           </div>

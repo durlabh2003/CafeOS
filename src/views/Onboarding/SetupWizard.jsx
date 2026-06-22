@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useCafe } from '../../context/CafeContext';
 
 export default function SetupWizard({ onComplete }) {

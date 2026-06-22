@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useCafe } from '../../context/CafeContext';
 
 export default function CustomerDashboard({ initialTableId = null, onExit }) {
@@ -7,12 +7,13 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
     menu,
     tables,
     orders,
-    crm,
     activeCustomerSessions,
     triggerOtpSms,
     verifyOtp,
     logoutCustomerSession,
     placeOrder,
+    getConsolidatedBill,
+    processOnlinePayment
   } = useCafe();
 
   // Selected table from props or scan simulator
@@ -21,6 +22,7 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
   // Sync prop changes
   useEffect(() => {
     if (initialTableId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTableId(initialTableId);
     }
   }, [initialTableId]);
@@ -34,7 +36,6 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
 
   // Menu/Order state
   const [activeCategory, setActiveCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -49,6 +50,12 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
   const [customizingItem, setCustomizingItem] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [selectedAddOns, setSelectedAddOns] = useState([]);
+
+  // Payment State
+  const [showBillModal, setShowBillModal] = useState(false);
+  const [showPaymentGateway, setShowPaymentGateway] = useState(false);
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   const isSessionActive = tableId && activeCustomerSessions[tableId];
   const sessionMobile = isSessionActive ? activeCustomerSessions[tableId] : null;
@@ -167,6 +174,12 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
 
   const recommendedUpsell = getUpsellRecommendation();
 
+  const executePlaceOrder = useCallback(() => {
+    placeOrder(tableId, sessionMobile || activeCustomerSessions[tableId], pendingCart, pendingInstructions, 'Dine-In');
+    setPendingCart(null);
+    setPendingInstructions('');
+  }, [tableId, sessionMobile, activeCustomerSessions, pendingCart, pendingInstructions, placeOrder]);
+
   // Timer effect for Order Edit Window
   useEffect(() => {
     let interval;
@@ -176,16 +189,11 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
       }, 1000);
     } else if (editTimer === 0 && pendingCart) {
       // Timer expired, actually place the order
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       executePlaceOrder();
     }
     return () => clearInterval(interval);
-  }, [editTimer, pendingCart]);
-
-  const executePlaceOrder = () => {
-    placeOrder(tableId, sessionMobile || activeCustomerSessions[tableId], pendingCart, pendingInstructions, 'Dine-In');
-    setPendingCart(null);
-    setPendingInstructions('');
-  };
+  }, [editTimer, pendingCart, executePlaceOrder]);
 
   const handlePlaceOrderClick = () => {
     if (cart.length === 0) return;
@@ -242,6 +250,31 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
   };
 
   const trackerStep = getTrackerStep();
+
+  const handlePayOnlineClick = () => {
+    setShowBillModal(false);
+    setShowPaymentGateway(true);
+  };
+
+  const handleMockPayment = async (method) => {
+    setPaymentProcessing(true);
+    // Simulate network delay
+    setTimeout(async () => {
+      const res = await processOnlinePayment(tableId, method, `TXN${Date.now()}`);
+      setPaymentProcessing(false);
+      if (res.success) {
+        setPaymentSuccess(true);
+        setTimeout(() => {
+          setPaymentSuccess(false);
+          setShowPaymentGateway(false);
+          setTableId(null);
+          if (onExit) onExit();
+        }, 3000);
+      } else {
+        alert(res.message);
+      }
+    }, 1500);
+  };
 
   return (
     <div className="theme-customer app-container animate-fade-in" style={{
@@ -416,6 +449,13 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
                     );
                   })}
                 </div>
+                
+                <button
+                  onClick={() => setShowBillModal(true)}
+                  style={{ width: '100%', padding: '12px', marginTop: '16px', background: 'var(--color-owner)', color: '#fff', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  🧾 View Bill & Pay Online
+                </button>
               </div>
             )}
 
@@ -758,6 +798,106 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
                         Go Back
                       </button>
                     </form>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* BILL MODAL */}
+            {showBillModal && (
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(15, 23, 42, 0.6)', zIndex: 800,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)'
+              }}>
+                <div className="animate-scale-in" style={{ width: '90%', background: '#ffffff', borderRadius: '24px', padding: '32px 24px', display: 'flex', flexDirection: 'column', maxHeight: '80%', overflowY: 'auto' }}>
+                  <div className="flex-between" style={{ marginBottom: '24px' }}>
+                    <h3 style={{ fontSize: '20px', color: 'var(--color-text-primary)', fontWeight: '800' }}>Your Bill</h3>
+                    <button onClick={() => setShowBillModal(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+                  </div>
+                  
+                  {(() => {
+                    const bill = getConsolidatedBill(tableId);
+                    if (!bill || bill.ordersList.length === 0) return <p>No pending bill.</p>;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {bill.ordersList.map(o => (
+                          <div key={o.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderBottom: '1px dashed var(--color-border)', paddingBottom: '12px' }}>
+                            {o.items.map((item, idx) => (
+                              <div key={idx} className="flex-between">
+                                <span style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{item.qty}x {item.name}</span>
+                                <span style={{ fontSize: '14px', fontWeight: '600' }}>₹{item.price * item.qty}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                        <div className="flex-between" style={{ marginTop: '8px' }}>
+                          <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>Subtotal</span>
+                          <span style={{ fontSize: '14px', fontWeight: '600' }}>₹{bill.subtotal}</span>
+                        </div>
+                        <div className="flex-between">
+                          <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}>Taxes ({bill.gstRate}%)</span>
+                          <span style={{ fontSize: '14px', fontWeight: '600' }}>₹{bill.gstAmount}</span>
+                        </div>
+                        <div className="flex-between" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '2px solid var(--color-border)' }}>
+                          <span style={{ fontSize: '18px', fontWeight: '800' }}>Grand Total</span>
+                          <span style={{ fontSize: '22px', fontWeight: '800', color: 'var(--color-success)' }}>₹{bill.grandTotal}</span>
+                        </div>
+
+                        <button onClick={handlePayOnlineClick} className="btn-primary" style={{ background: 'var(--color-success)', marginTop: '24px', padding: '16px', borderRadius: '12px', justifyContent: 'center' }}>
+                          Pay ₹{bill.grandTotal} Online
+                        </button>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* PAYMENT GATEWAY MODAL */}
+            {showPaymentGateway && (
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(15, 23, 42, 0.8)', zIndex: 900,
+                display: 'flex', alignItems: 'flex-end', backdropFilter: 'blur(8px)'
+              }}>
+                <div className="animate-scale-in" style={{ width: '100%', background: '#ffffff', borderRadius: '32px 32px 0 0', padding: '32px 24px 40px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {paymentSuccess ? (
+                    <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                      <div style={{ fontSize: '64px', marginBottom: '16px' }}>🎉</div>
+                      <h2 style={{ fontSize: '24px', color: 'var(--color-success)', fontWeight: '800', marginBottom: '8px' }}>Payment Successful!</h2>
+                      <p style={{ fontSize: '15px', color: 'var(--color-text-secondary)' }}>Thank you for visiting {cafeProfile.name}. See you next time!</p>
+                    </div>
+                  ) : paymentProcessing ? (
+                    <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                      <div className="spinner" style={{ border: '4px solid rgba(0,0,0,0.1)', borderLeftColor: 'var(--color-owner)', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
+                      <h3 style={{ fontSize: '18px', fontWeight: '700' }}>Processing Payment...</h3>
+                      <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '8px' }}>Please do not close this window.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-between" style={{ marginBottom: '8px' }}>
+                        <h3 style={{ fontSize: '20px', color: 'var(--color-text-primary)', fontWeight: '800' }}>Select Payment Method</h3>
+                        <button onClick={() => setShowPaymentGateway(false)} style={{ background: 'none', border: 'none', fontSize: '14px', color: 'var(--color-danger)', fontWeight: '700', cursor: 'pointer' }}>Cancel</button>
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <button onClick={() => handleMockPayment('UPI')} style={{ padding: '16px', borderRadius: '16px', border: '1px solid var(--color-border)', background: '#ffffff', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', boxShadow: 'var(--shadow-sm)' }}>
+                          <span style={{ fontSize: '24px' }}>📱</span>
+                          <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontSize: '16px', fontWeight: '700' }}>Pay via UPI</div>
+                            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>GPay, PhonePe, Paytm</div>
+                          </div>
+                        </button>
+                        <button onClick={() => handleMockPayment('Card')} style={{ padding: '16px', borderRadius: '16px', border: '1px solid var(--color-border)', background: '#ffffff', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', boxShadow: 'var(--shadow-sm)' }}>
+                          <span style={{ fontSize: '24px' }}>💳</span>
+                          <div style={{ textAlign: 'left' }}>
+                            <div style={{ fontSize: '16px', fontWeight: '700' }}>Credit / Debit Card</div>
+                            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Visa, MasterCard, RuPay</div>
+                          </div>
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>

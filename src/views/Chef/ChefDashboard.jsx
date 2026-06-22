@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCafe } from '../../context/CafeContext';
 import { printKOT } from '../../utils/printerSupport';
 
@@ -107,7 +107,9 @@ export default function ChefDashboard() {
       try {
         const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
         audio.play().catch(e => console.log('Audio autoplay blocked by browser', e));
-      } catch(e) {}
+      } catch (err) {
+        console.log('Audio play failed', err);
+      }
     }
     prevOrdersCountRef.current = currentNewOrders;
   }, [orders, soundEnabled]);

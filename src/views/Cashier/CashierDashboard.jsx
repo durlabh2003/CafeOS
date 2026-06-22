@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useCafe } from '../../context/CafeContext';
 import { printKOT } from '../../utils/printerSupport';
 
@@ -18,7 +18,10 @@ export default function CashierDashboard() {
     verifyOtp,
     processTakeaway,
     closeShift,
-    updateTableStatus
+    updateTableStatus,
+    cafeProfile,
+    transferTable,
+    simulateDeliveryOrder
   } = useCafe();
 
   const [activeTab, setActiveTab] = useState('pos');
@@ -91,6 +94,13 @@ export default function CashierDashboard() {
 
   const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
 
+  const executePlaceOrder = useCallback(() => {
+    const sessionMobile = tables.find(t => t.id === selectedTableId)?.currentSession?.mobile || '+91 99999 99999';
+    placeOrder(selectedTableId, sessionMobile, pendingCart, pendingNotes, 'Counter');
+    setPendingCart(null);
+    setPendingNotes('');
+  }, [tables, selectedTableId, pendingCart, pendingNotes, placeOrder]);
+
   // Timer effect for Order Edit Window
   useEffect(() => {
     let interval;
@@ -99,25 +109,20 @@ export default function CashierDashboard() {
         setEditTimer(prev => prev - 1);
       }, 1000);
     } else if (editTimer === 0 && pendingCart) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       executePlaceOrder();
     }
     return () => clearInterval(interval);
-  }, [editTimer, pendingCart]);
+  }, [editTimer, pendingCart, executePlaceOrder]);
 
   // If table selection changes, auto-confirm any pending order
   useEffect(() => {
     if (pendingCart && editTimer > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       executePlaceOrder();
       setEditTimer(0);
     }
-  }, [selectedTableId]);
-
-  const executePlaceOrder = () => {
-    const sessionMobile = tables.find(t => t.id === selectedTableId)?.currentSession?.mobile || '+91 99999 99999';
-    placeOrder(selectedTableId, sessionMobile, pendingCart, pendingNotes, 'Counter');
-    setPendingCart(null);
-    setPendingNotes('');
-  };
+  }, [selectedTableId, pendingCart, editTimer, executePlaceOrder]);
 
   const selectedTable = tables.find(t => t.id === selectedTableId);
   const activeTableOrders = selectedTableId
@@ -215,9 +220,9 @@ export default function CashierDashboard() {
   };
 
   const calculateBillTotals = () => {
-    let sub = 0;
-    let gstAmount = 0;
-    let grand = 0;
+    let sub;
+    let gstAmount;
+    let grand;
     
     if (selectedTableId === 'TAKEAWAY' && posCart.length > 0) {
       sub = posCart.reduce((acc, item) => acc + (item.price * item.qty), 0);
@@ -304,6 +309,7 @@ export default function CashierDashboard() {
           {[
             { id: 'pos', icon: '🖥️', label: 'POS & Tables' },
             { id: 'orders', icon: '📋', label: 'Active Orders' },
+            { id: 'delivery', icon: '🛵', label: 'Delivery Apps' },
             { id: 'customers', icon: '👥', label: 'Customers' },
             { id: 'reservations', icon: '📅', label: 'Reservations' },
             { id: 'shift', icon: '💰', label: 'Shift & Cash' }
@@ -727,6 +733,66 @@ export default function CashierDashboard() {
                   {order.status === 'Ready' && (
                     <button className="btn-primary" onClick={() => updateOrderStatus(order.id, 'Served')} style={{ width: '100%', marginTop: '16px', justifyContent: 'center', background: 'var(--color-success)' }}>
                       ✓ Mark as Served
+                    </button>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* --- DELIVERY APPS TAB --- */}
+      {activeTab === 'delivery' && (
+        <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
+          <div className="flex-between" style={{ marginBottom: '24px' }}>
+            <div>
+              <h2 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--color-text-primary)' }}>Delivery Aggregators</h2>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>Manage incoming online orders from Zomato and Swiggy.</p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button className="btn-secondary" onClick={() => simulateDeliveryOrder('Zomato')} style={{ borderColor: '#e23744', color: '#e23744', fontWeight: '700' }}>
+                + Mock Zomato Order
+              </button>
+              <button className="btn-secondary" onClick={() => simulateDeliveryOrder('Swiggy')} style={{ borderColor: '#fc8019', color: '#fc8019', fontWeight: '700' }}>
+                + Mock Swiggy Order
+              </button>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+            {orders
+              .filter(o => o.status !== 'Completed' && o.status !== 'Cancelled' && o.status !== 'Served')
+              .filter(o => o.source === 'Zomato' || o.source === 'Swiggy')
+              .map(order => (
+                <div key={order.id} className="premium-card" style={{ padding: '16px', borderTop: `4px solid ${order.source === 'Zomato' ? '#e23744' : '#fc8019'}` }}>
+                  <div className="flex-between" style={{ marginBottom: '12px', borderBottom: '1px dashed var(--color-border)', paddingBottom: '8px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--color-text-primary)' }}>{order.source} #{order.orderNumber}</span>
+                    <span className={`badge ${order.status === 'Ready' ? 'badge-success' : 'badge-warning'}`}>{order.status}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
+                    {order.items.map((it, idx) => (
+                      <div key={idx} className="flex-between" style={{ fontSize: '13px' }}>
+                        <span>{it.name} <span style={{ opacity: 0.6 }}>x{it.qty}</span></span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex-between" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '12px', marginBottom: '16px' }}>
+                     <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Bill Amount</span>
+                     <span style={{ fontSize: '14px', fontWeight: '800' }}>₹{order.amount} (Prepaid)</span>
+                  </div>
+                  
+                  {order.status === 'New' && (
+                    <button className="btn-primary" onClick={() => updateOrderStatus(order.id, 'Preparing')} style={{ width: '100%', justifyContent: 'center' }}>
+                      Accept Order
+                    </button>
+                  )}
+                  {order.status === 'Preparing' && (
+                    <button className="btn-primary" onClick={() => updateOrderStatus(order.id, 'Ready')} style={{ width: '100%', justifyContent: 'center', background: 'var(--color-pos)' }}>
+                      Mark as Ready
+                    </button>
+                  )}
+                  {order.status === 'Ready' && (
+                    <button className="btn-primary" onClick={() => updateOrderStatus(order.id, 'Completed')} style={{ width: '100%', justifyContent: 'center', background: 'var(--color-success)' }}>
+                      ✓ Handover to Rider
                     </button>
                   )}
                 </div>

@@ -1,10 +1,11 @@
 /**
- * CafeOS End-to-End Performance Benchmark Tests
+ * CafeOS End-toEnd Performance Benchmark Tests
  * 
  * Runs automated tests against the newly implemented functionalities
  * to ensure they meet the defined performance thresholds.
  */
 
+/* eslint-disable no-undef */
 import { runBenchmark, generateReport } from '../src/utils/benchmarkRunner.js';
 import { generateSingleQRPdf, generateBulkQRZip } from '../src/utils/qrGenerator.js';
 import { exportOrdersCSV, exportPaymentsCSV, exportCrmCSV } from '../src/utils/csvExporter.js';

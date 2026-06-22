@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { CafeProvider, useCafe } from './context/CafeContext';
 import Login from './views/Login/Login';
 import OwnerDashboard from './views/Owner/OwnerDashboard';

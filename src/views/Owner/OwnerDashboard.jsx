@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useCafe } from '../../context/CafeContext';
 import { generateSingleQRPdf, generateBulkQRZip } from '../../utils/qrGenerator';
 import { exportOrdersCSV, exportPaymentsCSV, exportCrmCSV } from '../../utils/csvExporter';
@@ -22,7 +22,10 @@ export default function OwnerDashboard() {
     regenerateTableQR,
     addStaff,
     updateCafeProfile,
-    getShiftHistory
+    getShiftHistory,
+    availableBranches,
+    activeBranch,
+    switchBranch
   } = useCafe();
 
   const [activeTab, setActiveTab] = useState('analytics');
@@ -93,7 +96,7 @@ export default function OwnerDashboard() {
         }
       });
     }
-  }, [activeTab]);
+  }, [activeTab, getShiftHistory]);
 
   // Staff creation state
   const [showStaffModal, setShowStaffModal] = useState(false);
@@ -155,8 +158,25 @@ export default function OwnerDashboard() {
     <div className="theme-owner app-container animate-fade-in" style={{ display: 'flex', flexDirection: 'row', height: 'calc(100vh - 72px)' }}>
       
       {/* Sidebar Menu */}
-      <aside style={{ width: '280px', borderRight: '1px solid var(--color-border)', background: 'var(--color-bg-sidebar)', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '32px', zIndex: 10, overflowY: 'auto' }}>
+      <aside style={{ width: '280px', borderRight: '1px solid var(--color-border)', background: 'var(--color-bg-sidebar)', padding: '24px 24px', display: 'flex', flexDirection: 'column', gap: '32px', zIndex: 10, overflowY: 'auto' }}>
         
+        {/* BRANCH SELECTOR */}
+        <div style={{ background: '#ffffff', borderRadius: '12px', padding: '12px', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+          <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Current Branch</div>
+          <select 
+            value={activeBranch.id} 
+            onChange={(e) => {
+              const branch = availableBranches.find(b => b.id === e.target.value);
+              if (branch) switchBranch(branch);
+            }}
+            style={{ width: '100%', padding: '8px', fontSize: '14px', fontWeight: '800', border: 'none', background: 'var(--color-bg-base)', borderRadius: '8px', cursor: 'pointer', color: 'var(--color-owner)' }}
+          >
+            {availableBranches.map(b => (
+              <option key={b.id} value={b.id}>{b.logo} {b.name}</option>
+            ))}
+          </select>
+        </div>
+
         <div>
           <h2 style={{ fontSize: '13px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', paddingLeft: '12px', marginBottom: '16px', fontWeight: '700' }}>Dashboard</h2>
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
