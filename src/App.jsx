@@ -10,23 +10,40 @@ import SetupWizard from './views/Onboarding/SetupWizard';
 
 function AppContent() {
   const { currentStaff } = useCafe();
-  const [simulatedCustomerTableId, setSimulatedCustomerTableId] = useState(null);
+  const [simulatedCustomerTableId, setSimulatedCustomerTableId] = useState(() => {
+    // If URL has ?table=xyz, initialize with that table
+    const params = new URLSearchParams(window.location.search);
+    return params.get('table') || null;
+  });
   const [setupComplete, setSetupComplete] = useState(() => localStorage.getItem('cafeos_setup_complete') === 'true');
 
   // Update URL to match current screen
   useEffect(() => {
-    let path = '/login';
+    let path = window.location.pathname;
+    let search = window.location.search;
+
     if (simulatedCustomerTableId) {
-      path = `/customer/table/${simulatedCustomerTableId}`;
+      // Only push state if we aren't already on the correct QR URL
+      if (path !== '/order') {
+        path = `/customer/table/${simulatedCustomerTableId}`;
+      } else {
+        path = '/order';
+        search = `?table=${simulatedCustomerTableId}`;
+      }
     } else if (currentStaff) {
+      search = '';
       if (currentStaff.role === 'Owner') path = setupComplete ? '/owner' : '/setup';
       else if (currentStaff.role === 'Manager') path = '/manager';
       else if (currentStaff.role === 'Counter Operator') path = '/cashier';
       else if (currentStaff.role === 'Kitchen Staff') path = '/chef';
+    } else {
+      path = '/login';
+      search = '';
     }
     
-    if (window.location.pathname !== path) {
-      window.history.pushState({}, '', path);
+    const newUrl = path + search;
+    if (window.location.pathname + window.location.search !== newUrl) {
+      window.history.pushState({}, '', newUrl);
     }
   }, [currentStaff, simulatedCustomerTableId, setupComplete]);
 
