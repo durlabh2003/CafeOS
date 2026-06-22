@@ -1,7 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useCafe } from '../../context/CafeContext';
-import { generateSingleQRPdf, generateBulkQRZip } from '../../utils/qrGenerator';
+import { generateSingleQRPdf, generateBulkQRZip, generateQRDataUrl, buildQRUrl } from '../../utils/qrGenerator';
 import { exportOrdersCSV, exportPaymentsCSV, exportCrmCSV } from '../../utils/csvExporter';
+
+// --- Inline QR Component to fetch async QR image ---
+function QRCodeImage({ table, cafeProfile }) {
+  const [qrDataUrl, setQrDataUrl] = useState(null);
+
+  useEffect(() => {
+    const fetchQR = async () => {
+      const url = buildQRUrl(table, cafeProfile);
+      const dataUrl = await generateQRDataUrl(url);
+      setQrDataUrl(dataUrl);
+    };
+    fetchQR();
+  }, [table, cafeProfile]);
+
+  if (!qrDataUrl) return <div style={{ width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⌛</div>;
+  return <img src={qrDataUrl} alt={`QR for ${table.name}`} style={{ width: '100px', height: '100px', borderRadius: '8px' }} />;
+}
 
 export default function OwnerDashboard() {
   const {
@@ -472,12 +489,8 @@ export default function OwnerDashboard() {
                     <div style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', color: 'var(--color-customer)', letterSpacing: '0.05em' }}>{cafeProfile.name}</div>
                     <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginBottom: '12px', marginTop: '2px' }}>Scan to Order Dine-In</div>
                     
-                    <div style={{ width: '120px', height: '120px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', margin: '0 auto 12px', display: 'flex', alignItems: 'center', justify: 'center', background: 'var(--color-bg-base)', position: 'relative' }}>
-                      <svg width="100" height="100" viewBox="0 0 100 100">
-                        <path d="M0 0h30v30H0zm40 0h30v10H40zm0 20h10v10H40zm30-20h30v30H70zm0 40h10v30H70zm20 10h10v20H90zm-90 20h30v30H0zm50 20h10v10H50z" fill="#0f172a" />
-                        <path d="M10 10h10v10H10zm70 0h10v10H80zM10 80h10v10H10z" fill="var(--color-customer)" />
-                      </svg>
-                      <span style={{ position: 'absolute', fontSize: '11px', fontWeight: '800', background: '#fff', padding: '2px 6px', border: '1px solid var(--color-border)', borderRadius: '6px' }}>{table.id}</span>
+                    <div style={{ width: '120px', height: '120px', margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                      <QRCodeImage table={table} cafeProfile={cafeProfile} />
                     </div>
 
                     <div style={{ fontSize: '15px', fontWeight: '700', borderTop: '1px dashed var(--color-border)', paddingTop: '10px' }}>{table.name}</div>

@@ -14,7 +14,7 @@ import JSZip from 'jszip';
  * @param {string} data - The data to encode in the QR code
  * @returns {Promise<string>} Base64 data URL of the QR code image
  */
-async function generateQRDataUrl(data) {
+export async function generateQRDataUrl(data) {
   return await QRCode.toDataURL(data, {
     width: 300,
     margin: 2,
@@ -32,7 +32,7 @@ async function generateQRDataUrl(data) {
  * @param {Object} cafeProfile - Café profile with id property
  * @returns {string} The URL to encode in the QR code
  */
-function buildQRUrl(table, cafeProfile) {
+export function buildQRUrl(table, cafeProfile) {
   const baseUrl = window.location.origin;
   const cafeId = cafeProfile.id || 'default';
   return `${baseUrl}/order?table=${table.id}&cafe=${cafeId}`;
