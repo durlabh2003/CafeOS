@@ -11,9 +11,9 @@ import SetupWizard from './views/Onboarding/SetupWizard';
 function AppContent() {
   const { currentStaff } = useCafe();
   const [simulatedCustomerTableId, setSimulatedCustomerTableId] = useState(() => {
-    // If URL has ?table=xyz, initialize with that table
+    // If URL has ?t=xyz or ?table=xyz, initialize with that table
     const params = new URLSearchParams(window.location.search);
-    return params.get('table') || null;
+    return params.get('t') || params.get('table') || null;
   });
   const [setupComplete, setSetupComplete] = useState(() => localStorage.getItem('cafeos_setup_complete') === 'true');
 
@@ -28,7 +28,7 @@ function AppContent() {
         path = `/customer/table/${simulatedCustomerTableId}`;
       } else {
         path = '/order';
-        search = `?table=${simulatedCustomerTableId}`;
+        search = `?t=${simulatedCustomerTableId}`;
       }
     } else if (currentStaff) {
       search = '';

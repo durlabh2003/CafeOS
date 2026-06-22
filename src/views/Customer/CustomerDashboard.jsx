@@ -288,22 +288,20 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
     }}>
       
       {/* Smartphone frame container */}
-      <div className="responsive-full-width" style={{
+      <div className="mock-phone-frame" style={{
         width: '390px',
-        height: '100%',
-        maxHeight: '800px',
+        height: '800px',
         background: '#ffffff',
-        borderRadius: window.innerWidth <= 768 ? '0' : '48px',
-        border: window.innerWidth <= 768 ? 'none' : '14px solid #0f172a',
-        boxShadow: window.innerWidth <= 768 ? 'none' : '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)',
+        borderRadius: '48px',
+        border: '14px solid #0f172a',
+        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)',
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden'
       }}>
-        
         {/* Notch */}
-        <div style={{
+        <div className="mock-phone-notch" style={{
           position: 'absolute',
           top: 0,
           left: '50%',

@@ -34,8 +34,7 @@ export async function generateQRDataUrl(data) {
  */
 export function buildQRUrl(table, cafeProfile) {
   const baseUrl = window.location.origin;
-  const cafeId = cafeProfile.id || 'default';
-  return `${baseUrl}/order?table=${table.id}&cafe=${cafeId}`;
+  return `${baseUrl}/order?t=${table.id}`;
 }
 
 /**
