@@ -282,19 +282,20 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
       alignItems: 'center',
       justifyContent: 'center',
       background: 'var(--color-bg-input)',
-      height: 'calc(100vh - 72px)',
+      height: '100dvh', // Use dvh for mobile browser toolbars
       overflowY: 'auto',
-      padding: '20px 0'
+      padding: '0' // Removed padding to allow full bleed on mobile
     }}>
       
       {/* Smartphone frame container */}
-      <div style={{
+      <div className="responsive-full-width" style={{
         width: '390px',
-        height: '800px',
+        height: '100%',
+        maxHeight: '800px',
         background: '#ffffff',
-        borderRadius: '48px',
-        border: '14px solid #0f172a',
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)',
+        borderRadius: window.innerWidth <= 768 ? '0' : '48px',
+        border: window.innerWidth <= 768 ? 'none' : '14px solid #0f172a',
+        boxShadow: window.innerWidth <= 768 ? 'none' : '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)',
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',

@@ -42,8 +42,9 @@ export default function Login({ onSimulateCustomerQR }) {
       padding: '40px 20px',
       color: '#0f172a'
     }}>
-      <div className="glass-panel" style={{
+      <div className="glass-panel responsive-flex-col responsive-full-width" style={{
         width: '1000px',
+        maxWidth: '100%',
         background: 'rgba(255,255,255,0.85)',
         display: 'flex',
         borderRadius: '24px',
@@ -69,7 +70,7 @@ export default function Login({ onSimulateCustomerQR }) {
             Simulate scanning a table QR code. Choose your table number to load the mobile dine-in ordering flow.
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+          <div className="grid-cols-4" style={{ gap: '10px' }}>
             {tables.map(t => (
               <button
                 key={t.id}
@@ -85,7 +86,8 @@ export default function Login({ onSimulateCustomerQR }) {
                   textAlign: 'center',
                   cursor: 'pointer',
                   boxShadow: 'var(--shadow-sm)',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  width: '100%'
                 }}
                 onMouseEnter={(e) => {
                   e.target.style.transform = 'translateY(-2px)';
@@ -186,7 +188,7 @@ export default function Login({ onSimulateCustomerQR }) {
             <span style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>
               🔑 Quick Login Cheat Sheet
             </span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div className="grid-cols-2" style={{ gap: '8px' }}>
               {demoAccounts.map(demo => (
                 <div
                   key={demo.email}
@@ -200,7 +202,8 @@ export default function Login({ onSimulateCustomerQR }) {
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'center',
-                    boxShadow: 'var(--shadow-sm)'
+                    boxShadow: 'var(--shadow-sm)',
+                    width: '100%'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(79, 70, 229, 0.03)'}
                   onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
