@@ -37,6 +37,12 @@ export const CafeProvider = ({ children }) => {
   });
   const [otpNotifications, setOtpNotifications] = useState([]);
 
+  // Sprint 3: Inventory & Analytics State
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [recipes, setRecipes] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [analyticsEvents, setAnalyticsEvents] = useState([]);
+
   useEffect(() => {
     if (currentStaff) {
       localStorage.setItem('cafe_current_staff', JSON.stringify(currentStaff));
@@ -53,7 +59,7 @@ export const CafeProvider = ({ children }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [cafesRes, settingsRes, catsRes, menuRes, tablesRes, customersRes, ordersRes, orderItemsRes, paymentsRes, staffRes] = await Promise.all([
+        const [cafesRes, settingsRes, catsRes, menuRes, tablesRes, customersRes, ordersRes, orderItemsRes, paymentsRes, staffRes, invRes, recRes, venRes, anaRes] = await Promise.all([
           supabase.from('cafes').select('*').limit(1),
           supabase.from('settings').select('*').limit(1),
           supabase.from('menu_categories').select('*'),
@@ -63,7 +69,11 @@ export const CafeProvider = ({ children }) => {
           supabase.from('orders').select('*').order('timestamp', { ascending: false }),
           supabase.from('order_items').select('*'),
           supabase.from('payments').select('*, bills(bill_number, orders(table_id, customer_id))').order('timestamp', { ascending: false }),
-          supabase.from('staff').select('*').order('id', { ascending: true })
+          supabase.from('staff').select('*').order('id', { ascending: true }),
+          supabase.from('inventory_items').select('*').order('name', { ascending: true }),
+          supabase.from('recipes').select('*'),
+          supabase.from('vendors').select('*').order('name', { ascending: true }),
+          supabase.from('analytics_events').select('*').order('created_at', { ascending: false })
         ]);
 
         let cafeId = null;
