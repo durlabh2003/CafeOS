@@ -61,13 +61,22 @@ export default function CashierDashboard() {
 
   // Notifications State
   const [showNotifications, setShowNotifications] = useState(false);
-  const readyOrders = orders.filter(o => o.status === 'Ready');
+  const notificationOrders = orders.filter(o => 
+    o.status === 'Ready' || 
+    (o.status === 'New' && (o.source === 'Zomato' || o.source === 'Swiggy'))
+  );
 
-  const dismissNotification = (orderId, source) => {
-    if (source === 'Zomato' || source === 'Swiggy') {
-      updateOrderStatus(orderId, 'Completed');
+  const handleNotificationAction = (order) => {
+    if (order.status === 'New') {
+      // Accept delivery order
+      updateOrderStatus(order.id, 'Preparing');
     } else {
-      updateOrderStatus(orderId, 'Served');
+      // Dismiss ready order
+      if (order.source === 'Zomato' || order.source === 'Swiggy') {
+        updateOrderStatus(order.id, 'Completed');
+      } else {
+        updateOrderStatus(order.id, 'Served');
+      }
     }
   };
 
@@ -385,7 +394,7 @@ export default function CashierDashboard() {
               }}
             >
               <span style={{ fontSize: '20px' }}>🔔</span>
-              {readyOrders.length > 0 && (
+              {notificationOrders.length > 0 && (
                 <span style={{
                   position: 'absolute',
                   top: '-4px',
@@ -402,7 +411,7 @@ export default function CashierDashboard() {
                   borderRadius: '99px',
                   border: '2px solid #ffffff'
                 }}>
-                  {readyOrders.length}
+                  {notificationOrders.length}
                 </span>
               )}
             </button>
@@ -424,27 +433,60 @@ export default function CashierDashboard() {
                 zIndex: 100
               }}>
                 <div style={{ padding: '16px', borderBottom: '1px solid var(--color-border)', fontWeight: '800', fontSize: '16px', color: 'var(--color-text-primary)' }}>
-                  Notifications ({readyOrders.length})
+                  Notifications ({notificationOrders.length})
                 </div>
                 <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {readyOrders.length === 0 ? (
+                  {notificationOrders.length === 0 ? (
                     <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px' }}>
                       No new notifications
                     </div>
                   ) : (
-                    readyOrders.map(order => (
-                      <div key={order.id} className="premium-card animate-fade-in" style={{ padding: '14px', background: 'var(--color-success)', color: '#ffffff', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
-                        <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: '1.4' }}>
-                          🔔 Order {order.orderNumber} is Ready for {tables.find(t => t.id === order.tableId)?.name || 'Takeaway'}
+                    notificationOrders.map(order => {
+                      const isNewDelivery = order.status === 'New' && (order.source === 'Zomato' || order.source === 'Swiggy');
+                      
+                      return (
+                        <div key={order.id} className="premium-card animate-fade-in" style={{ 
+                          padding: '14px', 
+                          background: isNewDelivery ? 'var(--color-warning)' : 'var(--color-success)', 
+                          color: isNewDelivery ? 'var(--color-text-primary)' : '#ffffff', 
+                          border: 'none', 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center', 
+                          boxShadow: isNewDelivery ? '0 4px 12px rgba(245, 158, 11, 0.2)' : '0 4px 12px rgba(16, 185, 129, 0.2)' 
+                        }}>
+                          <div style={{ fontSize: '13px', fontWeight: '700', lineHeight: '1.4' }}>
+                            {isNewDelivery ? (
+                              <>🔥 New {order.source} Order #{order.orderNumber}</>
+                            ) : (
+                              <>🔔 Order #{order.orderNumber} is Ready for {tables.find(t => t.id === order.tableId)?.name || 'Takeaway'}</>
+                            )}
+                          </div>
+                          <button 
+                            onClick={() => handleNotificationAction(order)}
+                            style={{ 
+                              background: isNewDelivery ? 'var(--color-pos)' : 'rgba(255,255,255,0.25)', 
+                              border: 'none', 
+                              color: '#fff', 
+                              borderRadius: isNewDelivery ? '6px' : '50%', 
+                              width: isNewDelivery ? 'auto' : '28px', 
+                              height: '28px', 
+                              padding: isNewDelivery ? '0 12px' : '0',
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              cursor: 'pointer', 
+                              flexShrink: 0, 
+                              marginLeft: '12px', 
+                              fontSize: isNewDelivery ? '12px' : '16px',
+                              fontWeight: isNewDelivery ? '700' : 'normal'
+                            }}
+                          >
+                            {isNewDelivery ? 'Accept' : '×'}
+                          </button>
                         </div>
-                        <button 
-                          onClick={() => dismissNotification(order.id, order.source)}
-                          style={{ background: 'rgba(255,255,255,0.25)', border: 'none', color: '#fff', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, marginLeft: '12px', fontSize: '16px' }}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>

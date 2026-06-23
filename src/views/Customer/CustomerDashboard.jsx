@@ -279,45 +279,13 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
   return (
     <div className="theme-customer app-container animate-fade-in" style={{
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--color-bg-input)',
+      flexDirection: 'column',
+      background: '#ffffff',
       height: '100dvh', // Use dvh for mobile browser toolbars
-      overflowY: 'auto',
-      padding: '0' // Removed padding to allow full bleed on mobile
+      width: '100%',
+      position: 'relative',
+      overflowX: 'hidden'
     }}>
-      
-      {/* Smartphone frame container */}
-      <div className="mock-phone-frame" style={{
-        width: '390px',
-        height: '800px',
-        background: '#ffffff',
-        borderRadius: '48px',
-        border: '14px solid #0f172a',
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)',
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}>
-        {/* Notch */}
-        <div className="mock-phone-notch" style={{
-          position: 'absolute',
-          top: 0,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '140px',
-          height: '28px',
-          background: '#0f172a',
-          borderRadius: '0 0 20px 20px',
-          zIndex: 1000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <div style={{ width: '48px', height: '6px', background: '#1e293b', borderRadius: '4px', marginRight: '12px' }} />
-          <div style={{ width: '10px', height: '10px', background: '#1e293b', borderRadius: '50%' }} />
-        </div>
 
         {/* --- CASE 1: SCANNED QR NEEDED --- */}
         {!tableId && (
@@ -903,7 +871,6 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
             )}
           </div>
         )}
-      </div>
     </div>
   );
 }
