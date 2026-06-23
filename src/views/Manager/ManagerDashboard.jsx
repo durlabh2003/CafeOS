@@ -48,6 +48,7 @@ export default function ManagerDashboard() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [editingItem, setEditingItem] = useState(null);
   const [showItemModal, setShowItemModal] = useState(false);
+  const [isNewCategory, setIsNewCategory] = useState(false);
   const [itemForm, setItemForm] = useState({
     name: '',
     category: 'Beverages',
@@ -141,11 +142,13 @@ export default function ManagerDashboard() {
   const handleEditItemClick = (item) => {
     setEditingItem(item);
     setItemForm(item);
+    setIsNewCategory(false);
     setShowItemModal(true);
   };
 
   const handleAddItemClick = () => {
     setEditingItem(null);
+    setIsNewCategory(false);
     setItemForm({
       name: '',
       category: 'Beverages',
@@ -616,16 +619,37 @@ export default function ManagerDashboard() {
               <div style={{ display: 'flex', gap: '20px' }}>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-primary)' }}>Category</label>
-                  <select
-                    value={itemForm.category}
-                    onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })}
-                    style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
-                  >
-                    <option value="Beverages">Beverages</option>
-                    <option value="Bakery">Bakery</option>
-                    <option value="Mains">Mains</option>
-                    <option value="Desserts">Desserts</option>
-                  </select>
+                  {!isNewCategory ? (
+                    <select
+                      value={itemForm.category}
+                      onChange={(e) => {
+                        if (e.target.value === 'NEW') {
+                          setIsNewCategory(true);
+                          setItemForm({ ...itemForm, category: '' });
+                        } else {
+                          setItemForm({ ...itemForm, category: e.target.value });
+                        }
+                      }}
+                      style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+                    >
+                      {categories.filter(c => c !== 'All').map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      <option value="NEW">+ Add New Category...</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        value={itemForm.category}
+                        onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })}
+                        placeholder="New category..."
+                        required
+                        style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--color-border)', fontSize: '14px' }}
+                      />
+                      <button type="button" onClick={() => { setIsNewCategory(false); setItemForm({ ...itemForm, category: categories.find(c => c !== 'All') || 'Beverages' }); }} className="btn-secondary" style={{ padding: '0 12px' }}>✕</button>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
