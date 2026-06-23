@@ -59,6 +59,18 @@ export default function CashierDashboard() {
   const [customerSearch, setCustomerSearch] = useState('');
   const [actualCash, setActualCash] = useState(0);
 
+  // Notifications State
+  const [showNotifications, setShowNotifications] = useState(false);
+  const readyOrders = orders.filter(o => o.status === 'Ready');
+
+  const dismissNotification = (orderId, source) => {
+    if (source === 'Zomato' || source === 'Swiggy') {
+      updateOrderStatus(orderId, 'Completed');
+    } else {
+      updateOrderStatus(orderId, 'Served');
+    }
+  };
+
   // Shift Calculations (Based on today's payments for this staff member)
   const today = new Date().toDateString();
   const shiftPayments = payments.filter(p => new Date(p.timestamp).toDateString() === today);
@@ -352,8 +364,94 @@ export default function CashierDashboard() {
       </aside>
 
       {/* Main Workspace Area */}
-      <main className="main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <main className="main-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
         
+        {/* Global Notifications Bell */}
+        <div style={{ position: 'absolute', top: '16px', right: '24px', zIndex: 100 }}>
+          <div style={{ position: 'relative' }}>
+            <button 
+              onClick={() => setShowNotifications(!showNotifications)}
+              style={{
+                background: '#ffffff',
+                border: '1px solid var(--color-border)',
+                borderRadius: '50%',
+                width: '44px',
+                height: '44px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: 'var(--shadow-sm)',
+                position: 'relative'
+              }}
+            >
+              <span style={{ fontSize: '20px' }}>🔔</span>
+              {readyOrders.length > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  background: 'var(--color-danger)',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  minWidth: '20px',
+                  height: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '99px',
+                  border: '2px solid #ffffff'
+                }}>
+                  {readyOrders.length}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div style={{
+                position: 'absolute',
+                top: '56px',
+                right: '0',
+                width: '380px',
+                background: '#ffffff',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: 'var(--shadow-xl)',
+                maxHeight: '450px',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                zIndex: 100
+              }}>
+                <div style={{ padding: '16px', borderBottom: '1px solid var(--color-border)', fontWeight: '800', fontSize: '16px', color: 'var(--color-text-primary)' }}>
+                  Notifications ({readyOrders.length})
+                </div>
+                <div style={{ padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {readyOrders.length === 0 ? (
+                    <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+                      No new notifications
+                    </div>
+                  ) : (
+                    readyOrders.map(order => (
+                      <div key={order.id} className="premium-card animate-fade-in" style={{ padding: '14px', background: 'var(--color-success)', color: '#ffffff', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
+                        <div style={{ fontSize: '13px', fontWeight: '600', lineHeight: '1.4' }}>
+                          🔔 Order {order.orderNumber} is Ready for {tables.find(t => t.id === order.tableId)?.name || 'Takeaway'}
+                        </div>
+                        <button 
+                          onClick={() => dismissNotification(order.id, order.source)}
+                          style={{ background: 'rgba(255,255,255,0.25)', border: 'none', color: '#fff', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, marginLeft: '12px', fontSize: '16px' }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* --- POS TAB --- */}
         {activeTab === 'pos' && (
           <div style={{ display: 'flex', flex: 1, flexDirection: 'row', overflow: 'hidden' }}>
