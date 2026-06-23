@@ -329,7 +329,7 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
           <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#ffffff' }}>
             {/* Customer view Header */}
             <div style={{
-              padding: '60px 24px 16px',
+              padding: '24px 24px 16px', // Reduced top padding since notch is gone
               background: '#ffffff',
               borderBottom: '1px solid var(--color-border)',
               display: 'flex',
@@ -441,33 +441,35 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
               </div>
             )}
 
+            {/* Category Bar - Fixed at top */}
+            <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '16px 24px', background: '#ffffff', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
+              {['All', ...new Set(menu.filter(i => i.status === 'Active').map(item => item.category))].map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '99px',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    background: activeCategory === cat ? 'var(--color-customer)' : '#ffffff',
+                    color: activeCategory === cat ? '#ffffff' : 'var(--color-text-secondary)',
+                    border: `1px solid ${activeCategory === cat ? 'var(--color-customer)' : 'var(--color-border)'}`,
+                    flexShrink: 0,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    boxShadow: activeCategory === cat ? 'var(--shadow-sm)' : 'none',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
             {/* Menu List */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '20px', background: 'var(--color-bg-base)' }}>
               
-              <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px' }}>
-                {['All', 'Beverages', 'Bakery', 'Mains'].map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '99px',
-                      fontSize: '13px',
-                      fontWeight: '700',
-                      background: activeCategory === cat ? 'var(--color-customer)' : '#ffffff',
-                      color: activeCategory === cat ? '#ffffff' : 'var(--color-text-secondary)',
-                      border: `1px solid ${activeCategory === cat ? 'var(--color-customer)' : 'var(--color-border)'}`,
-                      flexShrink: 0,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: activeCategory === cat ? 'var(--shadow-sm)' : 'none'
-                    }}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '80px' }}>
                 {menu
                   .filter(item => item.status === 'Active')
