@@ -674,8 +674,8 @@ export default function CashierDashboard() {
               )}
 
               {!pendingCart && isOrdering && (
-                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
-                  <div className="flex-between">
+                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, minHeight: 0 }}>
+                  <div className="flex-between" style={{ flexShrink: 0 }}>
                     <h4 style={{ fontSize: '18px', color: 'var(--color-text-primary)', fontWeight: '800' }}>🍔 Add Items</h4>
                     <button onClick={() => { setIsOrdering(false); setPosCart([]); }} style={{ color: 'var(--color-danger)', fontSize: '14px', fontWeight: '600' }}>Cancel</button>
                   </div>
@@ -688,7 +688,7 @@ export default function CashierDashboard() {
                     style={{ fontSize: '14px', padding: '12px 16px' }}
                   />
 
-                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', flexShrink: 0 }}>
                     {['All', ...new Set(menu.filter(i => i.status === 'Active').map(item => item.category))].map(cat => (
                       <button
                         key={cat}
@@ -710,22 +710,37 @@ export default function CashierDashboard() {
                     ))}
                   </div>
 
-                  <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px' }}>
+                  <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px', minHeight: 0 }}>
                     {menu
                       .filter(item => item.status === 'Active')
                       .filter(item => orderCategory === 'All' || item.category === orderCategory)
                       .filter(item => item.name.toLowerCase().includes(orderSearch.toLowerCase()))
-                      .map(item => (
-                        <div key={item.id} className="premium-card" style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--color-text-primary)' }}>{item.name}</div>
-                            <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>₹{item.price}</div>
+                      .map(item => {
+                        // Find if item exists in posCart (ignoring variants for basic UI simplicity)
+                        const cartItem = posCart.find(c => c.id === item.id);
+                        return (
+                          <div key={item.id} className="premium-card" style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--color-text-primary)' }}>{item.name}</div>
+                              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>₹{item.price}</div>
+                            </div>
+                            
+                            {cartItem ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--color-bg-input)', padding: '4px 8px', borderRadius: '8px', border: '1px solid var(--color-pos)' }}>
+                                <button onClick={() => {
+                                  setPosCart(prev => prev.map(c => c.cartKey === cartItem.cartKey ? { ...c, qty: c.qty - 1 } : c).filter(c => c.qty > 0));
+                                }} style={{ color: 'var(--color-text-primary)', fontWeight: '800', background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', padding: '0 4px' }}>-</button>
+                                <span style={{ fontSize: '14px', color: 'var(--color-text-primary)', fontWeight: '700', width: '20px', textAlign: 'center' }}>{cartItem.qty}</span>
+                                <button onClick={() => handleAddToPosCart(item)} style={{ color: 'var(--color-text-primary)', fontWeight: '800', background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', padding: '0 4px' }}>+</button>
+                              </div>
+                            ) : (
+                              <button className="btn-secondary" onClick={() => handleAddToPosCart(item)} style={{ padding: '6px 12px', fontSize: '12px' }}>
+                                + Add
+                              </button>
+                            )}
                           </div>
-                          <button className="btn-secondary" onClick={() => handleAddToPosCart(item)} style={{ padding: '6px 12px', fontSize: '12px' }}>
-                            + Add
-                          </button>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
 
                   {posCart.length > 0 && (
@@ -734,7 +749,7 @@ export default function CashierDashboard() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto', marginBottom: '16px' }}>
                         {posCart.map((it, idx) => (
                           <div key={idx} className="flex-between" style={{ fontSize: '13px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-                            <span>{it.name} <span style={{ opacity: 0.6 }}>x{it.qty}</span></span>
+                            <span>{it.name} <span style={{ opacity: 0.6, marginLeft: '4px' }}>x{it.qty}</span></span>
                             <span style={{ color: 'var(--color-text-primary)' }}>₹{it.price * it.qty}</span>
                           </div>
                         ))}
