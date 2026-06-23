@@ -39,14 +39,16 @@ const KDSTicketCard = ({ order, onNextStatus, menu, stationFilter }) => {
     <div className={`premium-card animate-scale-in ${pulseClass}`} style={{ display: 'flex', flexDirection: 'column', borderTop: `4px solid ${borderColor}`, overflow: 'hidden', height: '340px' }}>
       <div style={{ padding: '16px 20px', background: 'var(--color-bg-base)', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h4 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--color-text-primary)' }}>Table {order.tableId.slice(-2)}</h4>
+          <h4 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--color-text-primary)' }}>
+            {order.tableId === 'TAKEAWAY' ? 'Takeaway' : `Table ${order.tableId ? order.tableId.toString().slice(-2) : '??'}`}
+          </h4>
           <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>ID: {order.orderNumber} | {new Date(order.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
         <span className={`badge ${badgeColor}`} style={{ fontSize: '12px', padding: '4px 10px', fontWeight: '800' }}>⏱️ {formatElapsed(elapsed)}</span>
       </div>
 
       <div style={{ padding: '20px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {order.items
+        {order.items && order.items
           .filter(item => {
             if (stationFilter === 'All') return true;
             const menuItem = menu.find(m => m.id === item.id);
@@ -76,7 +78,8 @@ const KDSTicketCard = ({ order, onNextStatus, menu, stationFilter }) => {
       <div style={{ padding: '16px 20px', background: 'var(--color-bg-base)', borderTop: '1px solid var(--color-border)' }}>
         <div style={{ display: 'flex', gap: '8px', marginBottom: (order.status === 'New' || order.status === 'Preparing') ? '12px' : '0' }}>
           <button className="btn-secondary" onClick={async () => {
-            const res = await printKOT(order, `Table ${order.tableId.slice(-2)}`);
+            const tableLabel = order.tableId === 'TAKEAWAY' ? 'Takeaway' : `Table ${order.tableId ? order.tableId.toString().slice(-2) : '??'}`;
+            const res = await printKOT(order, tableLabel);
             if (!res.success) alert(res.message);
           }} style={{ flex: 1, padding: '8px', fontSize: '13px', justifyContent: 'center' }}>
             🖨️ Print Ticket
@@ -120,6 +123,7 @@ export default function ChefDashboard() {
   // Filter out orders that have NO items for the selected station
   const filteredActiveOrders = activeKdsOrders.filter(order => {
     if (stationFilter === 'All') return true;
+    if (!order.items) return false;
     const hasItemsForStation = order.items.some(item => {
       const menuItem = menu.find(m => m.id === item.id);
       if (!menuItem) return true;
