@@ -549,7 +549,7 @@ export default function CashierDashboard() {
                   />
 
                   <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
-                    {['All', 'Beverages', 'Bakery', 'Mains'].map(cat => (
+                    {['All', ...new Set(menu.filter(i => i.status === 'Active').map(item => item.category))].map(cat => (
                       <button
                         key={cat}
                         onClick={() => setOrderCategory(cat)}
@@ -561,7 +561,8 @@ export default function CashierDashboard() {
                           background: orderCategory === cat ? 'var(--color-pos)' : '#fff',
                           color: orderCategory === cat ? '#fff' : 'var(--color-text-secondary)',
                           border: `1px solid ${orderCategory === cat ? 'var(--color-pos)' : 'var(--color-border)'}`,
-                          transition: 'all 0.2s'
+                          transition: 'all 0.2s',
+                          whiteSpace: 'nowrap'
                         }}
                       >
                         {cat}
@@ -569,7 +570,7 @@ export default function CashierDashboard() {
                     ))}
                   </div>
 
-                  <div style={{ flex: 1, maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px' }}>
+                  <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px' }}>
                     {menu
                       .filter(item => item.status === 'Active')
                       .filter(item => orderCategory === 'All' || item.category === orderCategory)
