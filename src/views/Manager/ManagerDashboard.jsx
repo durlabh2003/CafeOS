@@ -163,7 +163,7 @@ export default function ManagerDashboard() {
     <div className="theme-owner app-container animate-fade-in" style={{ display: 'flex', flexDirection: 'row', height: 'calc(100vh - 72px)' }}>
       
       {/* Sidebar Menu */}
-      <aside style={{ width: '280px', borderRight: '1px solid var(--color-border)', background: 'var(--color-bg-sidebar)', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '32px', zIndex: 10 }}>
+      <aside style={{ width: '280px', borderRight: '1px solid var(--color-border)', background: 'var(--color-bg-sidebar)', padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: '32px', zIndex: 10, overflowY: 'auto' }}>
         <div>
           <h2 style={{ fontSize: '13px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', paddingLeft: '12px', marginBottom: '16px', fontWeight: '700' }}>Operations</h2>
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

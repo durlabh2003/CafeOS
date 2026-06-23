@@ -298,7 +298,7 @@ export default function CashierDashboard() {
   return (
     <div className="theme-pos app-container animate-fade-in" style={{ display: 'flex', height: '100vh', background: 'var(--color-bg-base)' }}>
       {/* Sidebar Navigation */}
-      <aside className="sidebar" style={{ width: '260px', background: '#ffffff', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', padding: '24px 0', zIndex: 10 }}>
+      <aside className="sidebar" style={{ width: '260px', background: '#ffffff', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', padding: '24px 0', zIndex: 10, overflowY: 'auto' }}>
         <div style={{ padding: '0 24px', marginBottom: '40px' }}>
           <h2 style={{ fontSize: '24px', fontWeight: '900', color: 'var(--color-owner)', letterSpacing: '-0.5px' }}>CaféOS</h2>
           <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-pos)', letterSpacing: '1px', marginTop: '4px' }}>Counter Operations</div>
