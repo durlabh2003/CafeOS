@@ -237,7 +237,7 @@ export default function OwnerDashboard() {
           </nav>
         </div>
 
-        <div style={{ marginTop: 'auto', borderTop: '1px solid var(--color-border)', paddingTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ marginTop: 'auto', borderTop: '1px solid var(--color-border)', paddingTop: '24px', paddingBottom: '24px', display: 'flex', flexDirection: 'column', gap: '16px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 12px' }}>
             <span style={{ fontSize: '28px', background: 'var(--color-bg-base)', padding: '8px', borderRadius: '12px' }}>{cafeProfile.logo}</span>
             <div>

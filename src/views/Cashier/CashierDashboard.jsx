@@ -331,7 +331,7 @@ export default function CashierDashboard() {
           ))}
         </nav>
 
-        <div style={{ padding: '24px', borderTop: '1px solid var(--color-border)', marginTop: 'auto' }}>
+        <div style={{ padding: '24px', borderTop: '1px solid var(--color-border)', marginTop: 'auto', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
             <div style={{ width: '40px', height: '40px', borderRadius: '20px', background: 'var(--color-pos)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '16px' }}>
               {currentStaff?.name?.charAt(0) || 'S'}
