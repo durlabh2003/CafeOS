@@ -329,8 +329,47 @@ export const CafeProvider = ({ children }) => {
   };
 
   const updateOrderStatus = async (orderId, newStatus) => {
+    const prevOrder = orders.find(o => o.id === orderId);
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+
+    // Auto-Inventory Deduction Hook
+    if (newStatus === 'Ready' && prevOrder && prevOrder.status !== 'Ready') {
+      try {
+        const deduplicatedUpdates = {};
+        if (prevOrder.items) {
+          prevOrder.items.forEach(orderItem => {
+            const itemRecipes = recipes.filter(r => r.menu_item_id === orderItem.id);
+            itemRecipes.forEach(recipe => {
+              const qtyUsed = recipe.quantity_required * orderItem.qty;
+              if (deduplicatedUpdates[recipe.inventory_item_id]) {
+                deduplicatedUpdates[recipe.inventory_item_id] += qtyUsed;
+              } else {
+                deduplicatedUpdates[recipe.inventory_item_id] = qtyUsed;
+              }
+            });
+          });
+
+          const inventoryToUpdate = [];
+          Object.keys(deduplicatedUpdates).forEach(invId => {
+            const invItem = inventoryItems.find(i => i.id === invId);
+            if (invItem) {
+              const newStock = Math.max(0, invItem.current_stock - deduplicatedUpdates[invId]);
+              inventoryToUpdate.push({ id: invId, current_stock: newStock });
+              setInventoryItems(prev => prev.map(i => i.id === invId ? { ...i, current_stock: newStock } : i));
+            }
+          });
+
+          if (inventoryToUpdate.length > 0) {
+            await Promise.all(inventoryToUpdate.map(update => 
+              supabase.from('inventory_items').update({ current_stock: update.current_stock }).eq('id', update.id)
+            ));
+          }
+        }
+      } catch (err) {
+        console.error('Inventory Deduction failed:', err);
+      }
+    }
   };
 
   const getConsolidatedBill = (tableId) => {

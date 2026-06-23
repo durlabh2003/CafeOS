@@ -29,6 +29,40 @@ export default function CashierDashboard() {
   const [isOrdering, setIsOrdering] = useState(false);
   const [showBillingModal, setShowBillingModal] = useState(false);
 
+  // Keyboard Shortcuts Hook
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Focus Search: Alt+S or Ctrl/Cmd+K
+      if ((e.altKey || e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'k')) {
+        e.preventDefault();
+        document.getElementById('pos-search')?.focus();
+      }
+
+      // Add First Item: Enter (when search is focused)
+      if (e.key === 'Enter' && document.activeElement?.id === 'pos-search') {
+        e.preventDefault();
+        const filteredMenu = menu
+          .filter(item => item.status === 'Active')
+          .filter(item => orderCategory === 'All' || item.category === orderCategory)
+          .filter(item => item.name.toLowerCase().includes(orderSearch.toLowerCase()));
+          
+        if (filteredMenu.length > 0) {
+          handleAddToPosCart(filteredMenu[0]);
+          setOrderSearch('');
+        }
+      }
+
+      // Confirm Order: Ctrl/Cmd+P
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        if (posCart.length > 0) handleConfirmPOSOrder();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [menu, orderCategory, orderSearch, posCart, selectedTableId]);
+
   const [checkInForm, setCheckInForm] = useState({ name: '', mobile: '' });
   const [posCart, setPosCart] = useState([]);
   const [orderNotes, setOrderNotes] = useState('');
@@ -681,8 +715,9 @@ export default function CashierDashboard() {
                   </div>
                   
                   <input
+                    id="pos-search"
                     type="text"
-                    placeholder="Search Menu..."
+                    placeholder="Search Menu (Alt+S)..."
                     value={orderSearch}
                     onChange={(e) => setOrderSearch(e.target.value)}
                     style={{ fontSize: '14px', padding: '12px 16px' }}
@@ -762,7 +797,7 @@ export default function CashierDashboard() {
                         style={{ width: '100%', marginBottom: '16px' }}
                       />
                       <button className="btn-primary" onClick={handleConfirmPOSOrder} style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '14px' }}>
-                        {selectedTableId === 'TAKEAWAY' ? '💳 Pay & Send Order' : '🔥 Send Order to KDS'}
+                        {selectedTableId === 'TAKEAWAY' ? '💳 Pay & Send Order (Ctrl+P)' : '🔥 Send Order to KDS (Ctrl+P)'}
                       </button>
                     </div>
                   )}
