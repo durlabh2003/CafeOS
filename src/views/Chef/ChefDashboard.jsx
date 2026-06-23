@@ -26,7 +26,7 @@ const KDSTicketCard = ({ order, onNextStatus, menu, stationFilter }) => {
   let badgeColor = 'badge-success';
   let pulseClass = '';
 
-  if (elapsedMinutes >= 10) {
+  if (elapsedMinutes >= 15) {
     borderColor = 'var(--color-danger)';
     badgeColor = 'badge-danger';
     pulseClass = 'animate-pulse';

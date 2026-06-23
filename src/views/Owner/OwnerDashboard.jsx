@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useCafe } from '../../context/CafeContext';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
 import { generateSingleQRPdf, generateBulkQRZip, generateQRDataUrl, buildQRUrl } from '../../utils/qrGenerator';
 import { exportOrdersCSV, exportPaymentsCSV, exportCrmCSV } from '../../utils/csvExporter';
 
@@ -320,24 +321,33 @@ export default function OwnerDashboard() {
             {/* SVG Charts */}
             <div className="grid-cols-2">
               <div className="premium-card" style={{ padding: '32px' }}>
-                <h3 style={{ fontSize: '18px', color: 'var(--color-text-primary)', marginBottom: '32px' }}>Sales Distribution ({analyticsTimeframe})</h3>
-                <div style={{ display: 'flex', height: '220px', alignItems: 'flex-end', justifyContent: 'space-between', paddingBottom: '20px', borderBottom: '1px solid var(--color-border)' }}>
-                  {filteredPayments.slice(-7).map((p, idx) => {
-                    const heightPercent = Math.min(100, (p.amount / 1250) * 100);
-                    return (
-                      <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '12px' }}>
-                        <div style={{ fontSize: '12px', color: 'var(--color-text-primary)', fontWeight: '700' }}>₹{p.amount}</div>
-                        <div style={{
-                          width: '32px',
-                          height: `${heightPercent}px`,
-                          background: 'var(--color-owner)',
-                          borderRadius: '6px 6px 0 0',
-                          transition: 'height 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
-                        }}></div>
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: '600' }}>T0{idx + 1}</div>
-                      </div>
-                    );
-                  })}
+                <h3 style={{ fontSize: '18px', color: 'var(--color-text-primary)', marginBottom: '32px' }}>Sales Trend ({analyticsTimeframe})</h3>
+                <div style={{ height: '240px', width: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={filteredPayments.slice(-7).map((p, idx) => ({
+                        name: `T0${idx + 1}`,
+                        amount: p.amount
+                      }))}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="var(--color-owner)" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="var(--color-owner)" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--color-text-secondary)' }} dy={10} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'var(--color-text-secondary)' }} tickFormatter={(val) => `₹${val}`} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
+                        itemStyle={{ color: 'var(--color-owner)', fontWeight: 'bold' }}
+                        formatter={(value) => [`₹${value}`, 'Sales']}
+                      />
+                      <Area type="monotone" dataKey="amount" stroke="var(--color-owner)" strokeWidth={3} fillOpacity={1} fill="url(#colorAmount)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
 

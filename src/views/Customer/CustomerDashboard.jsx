@@ -40,6 +40,7 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
   const [showCart, setShowCart] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [specialInstructions, setSpecialInstructions] = useState('');
+  const [cartPulse, setCartPulse] = useState(false);
   
   // Order Edit Window
   const [pendingCart, setPendingCart] = useState(null);
@@ -145,6 +146,8 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
     });
 
     setCustomizingItem(null);
+    setCartPulse(true);
+    setTimeout(() => setCartPulse(false), 300);
   };
 
   const updateCartQty = (cartKey, delta) => {
@@ -514,8 +517,10 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   cursor: 'pointer',
-                  boxShadow: '0 10px 25px -5px rgba(234, 88, 12, 0.4)',
+                  boxShadow: cartPulse ? '0 15px 30px -5px rgba(234, 88, 12, 0.6)' : '0 10px 25px -5px rgba(234, 88, 12, 0.4)',
                   animation: 'fadeIn 0.2s ease',
+                  transform: cartPulse ? 'scale(1.05) translateY(-5px)' : 'scale(1) translateY(0)',
+                  transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                   zIndex: 100
                 }}
               >
