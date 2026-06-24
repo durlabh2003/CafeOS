@@ -376,7 +376,7 @@ export default function CustomerDashboard({ initialTableId = null, onExit }) {
             </div>
 
             {/* Tracker */}
-            {tableOrders.length > 0 && (
+            {isSessionActive && tableOrders.length > 0 && (
               <div style={{ background: '#fffbeb', padding: '16px 24px', borderBottom: '1px solid #fde68a' }}>
                 <div className="flex-between" style={{ marginBottom: '12px' }}>
                   <span style={{ fontSize: '14px', fontWeight: '800', color: '#b45309' }}>🛵 Order Tracker</span>
