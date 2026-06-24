@@ -544,7 +544,7 @@ export default function CashierDashboard() {
             {tables.map(table => {
               const isSelected = selectedTableId === table.id;
               const tableOrders = orders.filter(o => o.tableId === table.id && o.status !== 'Completed' && o.status !== 'Cancelled');
-              const totalItemsCount = tableOrders.reduce((sum, o) => sum + o.items.reduce((s, it) => s + it.qty, 0), 0);
+              const totalItemsCount = tableOrders.reduce((sum, o) => sum + (o.items?.reduce((s, it) => s + it.qty, 0) || 0), 0);
               const totalValue = tableOrders.reduce((sum, o) => sum + o.amount, 0);
 
               let displayStatus = table.status;
@@ -826,7 +826,7 @@ export default function CashierDashboard() {
                             <span className={`badge ${order.status === 'New' ? 'badge-danger' : order.status === 'Preparing' ? 'badge-warning' : 'badge-success'}`}>{order.status}</span>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {order.items.map((it, idx) => (
+                            {order.items?.map((it, idx) => (
                               <div key={idx} className="flex-between" style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>
                                 <span>{it.name} <span style={{ opacity: 0.6 }}>x{it.qty}</span></span>
                                 <span style={{ fontWeight: '600' }}>₹{it.price * it.qty}</span>
@@ -915,7 +915,7 @@ export default function CashierDashboard() {
                     Table: <strong>{tables.find(t => t.id === order.tableId)?.name || 'Takeaway'}</strong>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {order.items.map((it, idx) => (
+                    {order.items?.map((it, idx) => (
                       <div key={idx} className="flex-between" style={{ fontSize: '13px' }}>
                         <span>{it.name} <span style={{ opacity: 0.6 }}>x{it.qty}</span></span>
                       </div>
@@ -960,7 +960,7 @@ export default function CashierDashboard() {
                     <span className={`badge ${order.status === 'Ready' ? 'badge-success' : 'badge-warning'}`}>{order.status}</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '16px' }}>
-                    {order.items.map((it, idx) => (
+                    {order.items?.map((it, idx) => (
                       <div key={idx} className="flex-between" style={{ fontSize: '13px' }}>
                         <span>{it.name} <span style={{ opacity: 0.6 }}>x{it.qty}</span></span>
                       </div>
@@ -1163,7 +1163,7 @@ export default function CashierDashboard() {
                           <span>₹{it.price * it.qty}.00</span>
                         </div>
                       ))
-                    : activeBill.ordersList.flatMap(o => o.items).map((it, idx) => (
+                    : activeBill.ordersList.flatMap(o => o.items || []).map((it, idx) => (
                         <div key={idx} className="flex-between">
                           <span>{it.name.slice(0, 18)} <span style={{ opacity: 0.5 }}>x{it.qty}</span></span>
                           <span>₹{it.price * it.qty}.00</span>
