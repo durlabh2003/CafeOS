@@ -9,7 +9,7 @@ import CustomerDashboard from './views/Customer/CustomerDashboard';
 import SetupWizard from './views/Onboarding/SetupWizard';
 
 function AppContent() {
-  const { currentStaff } = useCafe();
+  const { currentStaff, logoutStaff } = useCafe();
   const [simulatedCustomerTableId, setSimulatedCustomerTableId] = useState(() => {
     // If URL has ?t=xyz or ?table=xyz, initialize with that table
     const params = new URLSearchParams(window.location.search);
@@ -46,6 +46,31 @@ function AppContent() {
       window.history.pushState({}, '', newUrl);
     }
   }, [currentStaff, simulatedCustomerTableId, setupComplete]);
+
+  // Listen to browser Back/Forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      const search = new URLSearchParams(window.location.search);
+      
+      const tableMatch = path.match(/^\/customer\/table\/(.+)$/);
+      const tableQuery = search.get('t') || search.get('table');
+      
+      if (tableMatch) {
+        setSimulatedCustomerTableId(tableMatch[1]);
+      } else if (path === '/order' && tableQuery) {
+        setSimulatedCustomerTableId(tableQuery);
+      } else if (path === '/login' || path === '/') {
+        setSimulatedCustomerTableId(null);
+        if (currentStaff) logoutStaff();
+      } else {
+        setSimulatedCustomerTableId(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentStaff, logoutStaff]);
 
   // Simulated Customer Dine-In Interface via QR Click
   if (simulatedCustomerTableId) {
@@ -87,9 +112,6 @@ function AppContent() {
   // Enforce RBAC Portal layouts
   switch (currentStaff.role) {
     case 'Owner':
-      if (!setupComplete) {
-        return <SetupWizard onComplete={() => setSetupComplete(true)} />;
-      }
       return <OwnerDashboard />;
     case 'Manager':
       return <ManagerDashboard />;

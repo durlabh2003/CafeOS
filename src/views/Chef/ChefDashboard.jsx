@@ -210,10 +210,12 @@ export default function ChefDashboard() {
             {historyKdsOrders.slice(0, 50).map(order => (
               <div key={order.id} className="premium-card" style={{ padding: '16px' }}>
                 <div className="flex-between" style={{ marginBottom: '8px' }}>
-                  <strong style={{ fontSize: '14px' }}>Table {order.tableId.slice(-2)} ({order.orderNumber})</strong>
+                  <strong style={{ fontSize: '14px' }}>
+                    {order.tableId === 'TAKEAWAY' ? 'Takeaway' : `Table ${order.tableId ? order.tableId.toString().slice(-2) : '??'}`} ({order.orderNumber})
+                  </strong>
                   <span className="badge badge-success">Completed</span>
                 </div>
-                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>{order.items.map(it => `${it.qty}x ${it.name}`).join(', ')}</div>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: '1.5' }}>{order.items?.map(it => `${it.qty}x ${it.name}`).join(', ')}</div>
                 <button className="btn-secondary" onClick={() => updateOrderStatus(order.id, 'Preparing')} style={{ fontSize: '11px', padding: '6px 12px', marginTop: '12px' }}>Recall Ticket</button>
               </div>
             ))}
