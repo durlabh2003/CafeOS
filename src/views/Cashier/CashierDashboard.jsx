@@ -29,6 +29,12 @@ export default function CashierDashboard() {
   const [isOrdering, setIsOrdering] = useState(false);
   const [showBillingModal, setShowBillingModal] = useState(false);
 
+  const [checkInForm, setCheckInForm] = useState({ name: '', mobile: '' });
+  const [posCart, setPosCart] = useState([]);
+  const [orderNotes, setOrderNotes] = useState('');
+  const [orderCategory, setOrderCategory] = useState('All');
+  const [orderSearch, setOrderSearch] = useState('');
+
   // Keyboard Shortcuts Hook
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -62,12 +68,6 @@ export default function CashierDashboard() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [menu, orderCategory, orderSearch, posCart, selectedTableId]);
-
-  const [checkInForm, setCheckInForm] = useState({ name: '', mobile: '' });
-  const [posCart, setPosCart] = useState([]);
-  const [orderNotes, setOrderNotes] = useState('');
-  const [orderCategory, setOrderCategory] = useState('All');
-  const [orderSearch, setOrderSearch] = useState('');
   
   // Order Edit Window
   const [pendingCart, setPendingCart] = useState(null);
